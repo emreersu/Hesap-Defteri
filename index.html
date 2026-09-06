@@ -130,6 +130,20 @@
     background:var(--ink);
     color:var(--white);
   }
+  #scope-month-input{
+    display:none;
+    width:100%;
+    padding:10px 12px;
+    border:1px solid var(--paper-line);
+    border-radius:9px;
+    background:var(--white);
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    color:var(--ink);
+    margin-bottom:18px;
+    outline:none;
+  }
+  #scope-month-input:focus{border-color:var(--ink);}
 
   .hero{
     text-align:left;
@@ -151,6 +165,12 @@
   }
   .hero .amount.positive{color:var(--green);}
   .hero .amount.negative{color:var(--rust);}
+  .hero-breakdown{
+    font-size:12px;
+    color:var(--ink-soft);
+    margin-top:8px;
+  }
+  .hero-breakdown b{font-weight:600;}
 
   .chip-row{
     display:flex;
@@ -374,14 +394,18 @@
     <section id="screen-ozet" class="screen active">
       <div class="scope-toggle">
         <button id="scope-month" class="active" onclick="setScope('month')">Bu Ay</button>
+        <button id="scope-pick" onclick="setScope('pick')">Ay Seç</button>
         <button id="scope-all" onclick="setScope('all')">Tüm Zamanlar</button>
       </div>
+      <input type="month" id="scope-month-input" onchange="onMonthPick()">
+
 
       <div id="budget-alert-box"></div>
 
       <div class="hero">
-        <div class="label" id="hero-label">Net durum</div>
+        <div class="label" id="hero-label">Bakiye</div>
         <div class="amount" id="net-amount">₺0,00</div>
+        <div class="hero-breakdown" id="hero-breakdown" style="display:none;"></div>
       </div>
 
       <div class="chip-row">
@@ -407,8 +431,9 @@
             <div class="chip-value" id="chip-expense-eur">€0,00</div>
           </div>
         </div>
-        <div class="section-sub" style="margin-top:8px;">Net (€): <b id="net-eur" style="color:var(--ink);">€0,00</b></div>
-        <div class="section-sub" id="combined-line" style="display:none;">Kur ile birleşik net (₺): <b id="net-combined" style="color:var(--ink);"></b></div>
+        <div class="section-sub" style="margin-top:8px;">Bakiye (€): <b id="net-eur" style="color:var(--ink);">€0,00</b></div>
+        <div class="section-sub" id="eur-breakdown" style="display:none;"></div>
+        <div class="section-sub" id="combined-line" style="display:none;">Kur ile birleşik bakiye (₺): <b id="net-combined" style="color:var(--ink);"></b></div>
       </div>
 
       <div class="section">
@@ -529,6 +554,20 @@
       </div>
 
       <div class="section">
+        <div class="section-title">Başlangıç Bakiyesi</div>
+        <div class="section-sub">Uygulamayı kullanmaya başladığın andaki gerçek bakiyeni bir kereliğine gir — sonraki her ay bu üzerinden otomatik devreder.</div>
+        <div class="field">
+          <label>Başlangıç Bakiyesi (₺)</label>
+          <input type="number" id="f-initbal-try" step="0.01" placeholder="örn. 5000">
+        </div>
+        <div class="field">
+          <label>Başlangıç Bakiyesi (€)</label>
+          <input type="number" id="f-initbal-eur" step="0.01" placeholder="örn. 0">
+        </div>
+        <button class="save-btn neutral small" onclick="saveInitialBalance()">Başlangıç Bakiyesini Kaydet</button>
+      </div>
+
+      <div class="section">
         <div class="section-title">Euro Kuru (opsiyonel)</div>
         <div class="section-sub">Girersen € kayıtların ₺ karşılığıyla birleşik net durumu da görürsün.</div>
         <div class="field">
@@ -608,13 +647,14 @@ const K_IOS_HINT = "butce_ios_hint_dismissed";
 let entries = [];
 let recurring = [];
 let budgets = {};
-let settings = { eurRate: null };
+let settings = { eurRate: null, initialBalanceTRY: 0, initialBalanceEUR: 0 };
 
 let currentType = "Gider";
 let currentMethod = "Kart";
 let currentCurrency = "TRY";
 let currentRecMethod = "Kart";
 let currentScope = "month";
+let pickedMonth = null; // { year, monthIndex } when currentScope === 'pick'
 let editingId = null;
 
 function todayISO(){ return new Date().toISOString().slice(0,10); }
@@ -640,7 +680,7 @@ function loadAll(){
   entries.forEach(e => { if(!e.currency) e.currency = 'TRY'; });
   recurring = safeParse(localStorage.getItem(K_RECURRING), []);
   budgets = safeParse(localStorage.getItem(K_BUDGETS), {});
-  settings = safeParse(localStorage.getItem(K_SETTINGS), { eurRate: null });
+  settings = safeParse(localStorage.getItem(K_SETTINGS), { eurRate: null, initialBalanceTRY: 0, initialBalanceEUR: 0 });
 }
 function persistEntries(){ try{ localStorage.setItem(K_ENTRIES, JSON.stringify(entries)); }catch(e){ showToast('Kayıt yapılamadı'); } }
 function persistRecurring(){ try{ localStorage.setItem(K_RECURRING, JSON.stringify(recurring)); }catch(e){} }
@@ -688,8 +728,50 @@ function showScreen(name){
 function setScope(scope){
   currentScope = scope;
   document.getElementById('scope-month').classList.toggle('active', scope==='month');
+  document.getElementById('scope-pick').classList.toggle('active', scope==='pick');
   document.getElementById('scope-all').classList.toggle('active', scope==='all');
+
+  const input = document.getElementById('scope-month-input');
+  if(scope === 'pick'){
+    input.style.display = 'block';
+    if(!input.value){
+      const now = new Date();
+      input.value = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+    }
+    onMonthPick();
+  } else {
+    input.style.display = 'none';
+    renderSummary();
+  }
+}
+
+function onMonthPick(){
+  const val = document.getElementById('scope-month-input').value;
+  if(!val) return;
+  const [y,m] = val.split('-').map(Number);
+  pickedMonth = { year: y, monthIndex: m-1 };
   renderSummary();
+}
+
+function isMonthlyView(){ return currentScope !== 'all'; }
+
+function getScopeYearMonth(){
+  if(currentScope === 'all') return null;
+  if(currentScope === 'pick' && pickedMonth) return { year: pickedMonth.year, monthIndex: pickedMonth.monthIndex };
+  const now = new Date();
+  return { year: now.getFullYear(), monthIndex: now.getMonth() };
+}
+
+function periodLabel(){
+  if(currentScope === 'all') return 'Tüm Zamanlar';
+  let d;
+  if(currentScope === 'pick' && pickedMonth){
+    d = new Date(pickedMonth.year, pickedMonth.monthIndex, 1);
+  } else {
+    d = new Date();
+  }
+  const label = d.toLocaleDateString('tr-TR', {month:'long', year:'numeric'});
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 function setType(type){
@@ -802,14 +884,33 @@ function showToast(msg){
 
 // ---------- scoping helpers ----------
 function scopedEntries(){
-  if(currentScope === 'all') return entries;
-  const now = new Date();
-  const y = now.getFullYear(), m = now.getMonth();
+  const ym = getScopeYearMonth();
+  if(!ym) return entries;
   return entries.filter(e => {
     const d = new Date(e.date);
-    return d.getFullYear() === y && d.getMonth() === m;
+    return d.getFullYear() === ym.year && d.getMonth() === ym.monthIndex;
   });
 }
+
+// Balance carried in from before the current scope's period, plus the one-time
+// initial balance the user set in Ayarlar. This is what makes the running
+// balance carry over from month to month instead of resetting each period.
+function openingBalance(currency){
+  const base = currency === 'EUR' ? (settings.initialBalanceEUR||0) : (settings.initialBalanceTRY||0);
+  const ym = getScopeYearMonth();
+  if(!ym) return base; // "Tüm Zamanlar" already covers every entry — nothing more to carry in
+  const cutoff = new Date(ym.year, ym.monthIndex, 1);
+  let income = 0, expense = 0;
+  entries.forEach(e => {
+    if((e.currency||'TRY') !== currency) return;
+    const d = new Date(e.date);
+    if(d < cutoff){
+      if(e.type === 'Gelir') income += e.amount; else expense += e.amount;
+    }
+  });
+  return base + income - expense;
+}
+
 function sumType(list, type, currency){
   return list.filter(e => e.type===type && (e.currency||'TRY')===currency).reduce((s,e)=>s+e.amount,0);
 }
@@ -857,7 +958,7 @@ function renderCategoryBlock(currency, giderList, donutElId, listElId){
   donutEl.innerHTML = `<div class="donut-wrap">${svg}<div class="donut-legend">${legend}</div></div>`;
 
   // budget rows (TRY only)
-  if(currency === 'TRY' && currentScope === 'month'){
+  if(currency === 'TRY' && isMonthlyView()){
     const rows = catEntries.map(([cat,val]) => {
       const limit = budgets[cat];
       if(!limit || limit <= 0) return '';
@@ -940,10 +1041,23 @@ function renderSummary(){
   const expenseEUR = sumType(eurList,'Gider','EUR');
   const netEUR = incomeEUR - expenseEUR;
 
-  document.getElementById('hero-label').textContent = hasEUR ? 'Net durum (₺)' : 'Net durum';
+  const openingTRY = openingBalance('TRY');
+  const closingTRY = openingTRY + netTRY;
+  const openingEUR = openingBalance('EUR');
+  const closingEUR = openingEUR + netEUR;
+
+  document.getElementById('hero-label').textContent = 'Bakiye' + (hasEUR ? ' (₺)' : '') + ' — ' + periodLabel();
   const netEl = document.getElementById('net-amount');
-  netEl.textContent = fmt(netTRY, 'TRY');
-  netEl.className = 'amount ' + (netTRY >= 0 ? 'positive' : 'negative');
+  netEl.textContent = fmt(closingTRY, 'TRY');
+  netEl.className = 'amount ' + (closingTRY >= 0 ? 'positive' : 'negative');
+
+  const breakdownEl = document.getElementById('hero-breakdown');
+  if(isMonthlyView()){
+    breakdownEl.style.display = 'block';
+    breakdownEl.innerHTML = `Devreden: <b>${fmt(openingTRY,'TRY')}</b> · Bu dönem: <b style="color:${netTRY>=0?'var(--green)':'var(--rust)'};">${netTRY>=0?'+':''}${fmt(netTRY,'TRY')}</b>`;
+  } else {
+    breakdownEl.style.display = 'none';
+  }
 
   document.getElementById('chip-income').textContent = fmt(incomeTRY, 'TRY');
   document.getElementById('chip-expense').textContent = fmt(expenseTRY, 'TRY');
@@ -952,12 +1066,21 @@ function renderSummary(){
   if(hasEUR){
     document.getElementById('chip-income-eur').textContent = fmt(incomeEUR,'EUR');
     document.getElementById('chip-expense-eur').textContent = fmt(expenseEUR,'EUR');
-    document.getElementById('net-eur').textContent = fmt(netEUR,'EUR');
+    document.getElementById('net-eur').textContent = fmt(closingEUR,'EUR');
+
+    const eurBreakdownEl = document.getElementById('eur-breakdown');
+    if(isMonthlyView()){
+      eurBreakdownEl.style.display = 'block';
+      eurBreakdownEl.innerHTML = `Devreden: <b style="color:var(--ink);">${fmt(openingEUR,'EUR')}</b> · Bu dönem: <b style="color:${netEUR>=0?'var(--green)':'var(--rust)'};">${netEUR>=0?'+':''}${fmt(netEUR,'EUR')}</b>`;
+    } else {
+      eurBreakdownEl.style.display = 'none';
+    }
+
     const rate = settings.eurRate;
     const combinedLine = document.getElementById('combined-line');
     if(rate && rate > 0){
       combinedLine.style.display = 'block';
-      document.getElementById('net-combined').textContent = fmt(netTRY + netEUR*rate, 'TRY');
+      document.getElementById('net-combined').textContent = fmt(closingTRY + closingEUR*rate, 'TRY');
     } else {
       combinedLine.style.display = 'none';
     }
@@ -995,7 +1118,7 @@ function renderSummary(){
 
   // budget alert banner (month scope only)
   const alertBox = document.getElementById('budget-alert-box');
-  if(currentScope === 'month'){
+  if(isMonthlyView()){
     const overCats = Object.keys(budgets).filter(cat => {
       const limit = budgets[cat];
       if(!limit || limit<=0) return false;
@@ -1003,7 +1126,7 @@ function renderSummary(){
       return spent > limit;
     });
     alertBox.innerHTML = overCats.length
-      ? `<div class="budget-alert">⚠️ Bu ay bütçe limitini aşan kategoriler: <b>${overCats.join(', ')}</b></div>`
+      ? `<div class="budget-alert">⚠️ ${periodLabel()} bütçe limitini aşan kategoriler: <b>${overCats.join(', ')}</b></div>`
       : '';
   } else {
     alertBox.innerHTML = '';
@@ -1045,6 +1168,8 @@ function escapeHtml(s){
 // ---------- Ayarlar screen ----------
 function renderAyarlar(){
   document.getElementById('f-eurrate').value = settings.eurRate || '';
+  document.getElementById('f-initbal-try').value = settings.initialBalanceTRY || '';
+  document.getElementById('f-initbal-eur').value = settings.initialBalanceEUR || '';
 
   const budgetListEl = document.getElementById('budget-list');
   budgetListEl.innerHTML = GIDER_KATEGORILERI.map(cat => `
@@ -1113,6 +1238,16 @@ function saveBudgets(){
   showToast('Bütçe limitleri kaydedildi');
 }
 
+function saveInitialBalance(){
+  const tryVal = parseFloat(document.getElementById('f-initbal-try').value);
+  const eurVal = parseFloat(document.getElementById('f-initbal-eur').value);
+  settings.initialBalanceTRY = isFinite(tryVal) ? tryVal : 0;
+  settings.initialBalanceEUR = isFinite(eurVal) ? eurVal : 0;
+  persistSettings();
+  renderSummary();
+  showToast('Başlangıç bakiyesi kaydedildi');
+}
+
 function saveEurRate(){
   const val = parseFloat(document.getElementById('f-eurrate').value);
   settings.eurRate = (val && val > 0) ? val : null;
@@ -1148,7 +1283,7 @@ function importData(event){
       entries.forEach(e => { if(!e.currency) e.currency = 'TRY'; });
       recurring = Array.isArray(data.recurring) ? data.recurring : [];
       budgets = (data.budgets && typeof data.budgets === 'object') ? data.budgets : {};
-      settings = (data.settings && typeof data.settings === 'object') ? data.settings : { eurRate: null };
+      settings = (data.settings && typeof data.settings === 'object') ? data.settings : { eurRate: null, initialBalanceTRY: 0, initialBalanceEUR: 0 };
       persistEntries(); persistRecurring(); persistBudgets(); persistSettings();
       renderAyarlar();
       showToast('Yedek başarıyla yüklendi');
