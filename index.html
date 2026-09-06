@@ -130,6 +130,20 @@
     background:var(--ink);
     color:var(--white);
   }
+  #scope-month-input{
+    display:none;
+    width:100%;
+    padding:10px 12px;
+    border:1px solid var(--paper-line);
+    border-radius:9px;
+    background:var(--white);
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    color:var(--ink);
+    margin-bottom:18px;
+    outline:none;
+  }
+  #scope-month-input:focus{border-color:var(--ink);}
 
   .hero{
     text-align:left;
@@ -374,8 +388,11 @@
     <section id="screen-ozet" class="screen active">
       <div class="scope-toggle">
         <button id="scope-month" class="active" onclick="setScope('month')">Bu Ay</button>
+        <button id="scope-pick" onclick="setScope('pick')">Ay Seç</button>
         <button id="scope-all" onclick="setScope('all')">Tüm Zamanlar</button>
       </div>
+      <input type="month" id="scope-month-input" onchange="onMonthPick()">
+
 
       <div id="budget-alert-box"></div>
 
@@ -615,6 +632,7 @@ let currentMethod = "Kart";
 let currentCurrency = "TRY";
 let currentRecMethod = "Kart";
 let currentScope = "month";
+let pickedMonth = null; // { year, monthIndex } when currentScope === 'pick'
 let editingId = null;
 
 function todayISO(){ return new Date().toISOString().slice(0,10); }
@@ -688,8 +706,43 @@ function showScreen(name){
 function setScope(scope){
   currentScope = scope;
   document.getElementById('scope-month').classList.toggle('active', scope==='month');
+  document.getElementById('scope-pick').classList.toggle('active', scope==='pick');
   document.getElementById('scope-all').classList.toggle('active', scope==='all');
+
+  const input = document.getElementById('scope-month-input');
+  if(scope === 'pick'){
+    input.style.display = 'block';
+    if(!input.value){
+      const now = new Date();
+      input.value = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+    }
+    onMonthPick();
+  } else {
+    input.style.display = 'none';
+    renderSummary();
+  }
+}
+
+function onMonthPick(){
+  const val = document.getElementById('scope-month-input').value;
+  if(!val) return;
+  const [y,m] = val.split('-').map(Number);
+  pickedMonth = { year: y, monthIndex: m-1 };
   renderSummary();
+}
+
+function isMonthlyView(){ return currentScope !== 'all'; }
+
+function periodLabel(){
+  if(currentScope === 'all') return 'Tüm Zamanlar';
+  let d;
+  if(currentScope === 'pick' && pickedMonth){
+    d = new Date(pickedMonth.year, pickedMonth.monthIndex, 1);
+  } else {
+    d = new Date();
+  }
+  const label = d.toLocaleDateString('tr-TR', {month:'long', year:'numeric'});
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 function setType(type){
@@ -803,8 +856,13 @@ function showToast(msg){
 // ---------- scoping helpers ----------
 function scopedEntries(){
   if(currentScope === 'all') return entries;
-  const now = new Date();
-  const y = now.getFullYear(), m = now.getMonth();
+  let y, m;
+  if(currentScope === 'pick' && pickedMonth){
+    y = pickedMonth.year; m = pickedMonth.monthIndex;
+  } else {
+    const now = new Date();
+    y = now.getFullYear(); m = now.getMonth();
+  }
   return entries.filter(e => {
     const d = new Date(e.date);
     return d.getFullYear() === y && d.getMonth() === m;
@@ -857,7 +915,7 @@ function renderCategoryBlock(currency, giderList, donutElId, listElId){
   donutEl.innerHTML = `<div class="donut-wrap">${svg}<div class="donut-legend">${legend}</div></div>`;
 
   // budget rows (TRY only)
-  if(currency === 'TRY' && currentScope === 'month'){
+  if(currency === 'TRY' && isMonthlyView()){
     const rows = catEntries.map(([cat,val]) => {
       const limit = budgets[cat];
       if(!limit || limit <= 0) return '';
@@ -940,7 +998,7 @@ function renderSummary(){
   const expenseEUR = sumType(eurList,'Gider','EUR');
   const netEUR = incomeEUR - expenseEUR;
 
-  document.getElementById('hero-label').textContent = hasEUR ? 'Net durum (₺)' : 'Net durum';
+  document.getElementById('hero-label').textContent = 'Net durum' + (hasEUR ? ' (₺)' : '') + ' — ' + periodLabel();
   const netEl = document.getElementById('net-amount');
   netEl.textContent = fmt(netTRY, 'TRY');
   netEl.className = 'amount ' + (netTRY >= 0 ? 'positive' : 'negative');
@@ -995,7 +1053,7 @@ function renderSummary(){
 
   // budget alert banner (month scope only)
   const alertBox = document.getElementById('budget-alert-box');
-  if(currentScope === 'month'){
+  if(isMonthlyView()){
     const overCats = Object.keys(budgets).filter(cat => {
       const limit = budgets[cat];
       if(!limit || limit<=0) return false;
@@ -1003,7 +1061,7 @@ function renderSummary(){
       return spent > limit;
     });
     alertBox.innerHTML = overCats.length
-      ? `<div class="budget-alert">⚠️ Bu ay bütçe limitini aşan kategoriler: <b>${overCats.join(', ')}</b></div>`
+      ? `<div class="budget-alert">⚠️ ${periodLabel()} bütçe limitini aşan kategoriler: <b>${overCats.join(', ')}</b></div>`
       : '';
   } else {
     alertBox.innerHTML = '';
