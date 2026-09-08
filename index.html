@@ -629,12 +629,13 @@
 </div>
 
 <script>
-const GELIR_KATEGORILERI = ["Maaş","Ek Gelir","Yatırım Geliri","Diğer Gelir"];
-const GIDER_KATEGORILERI = ["Market/Gıda","Kira/Aidat","Faturalar","Ulaşım","Sağlık","Eğitim","Giyim","Ev Eşyası/Bakım","Eğlence/Sosyal","Kişisel Bakım","Borç/Kredi Ödemesi","Diğer Gider"];
+const GELIR_KATEGORILERI = ["Maaş","Ek Gelir","Yatırım Geliri","Borç Tahsilatı","Diğer Gelir"];
+const GIDER_KATEGORILERI = ["Market/Gıda","Restoran/Kafe","Kira/Aidat","Faturalar","Abonelikler","Ulaşım","Sağlık","Sigorta","Eğitim","Giyim","Ev Eşyası/Bakım","Eğlence/Sosyal","Seyahat/Tatil","Spor/Fitness","Kişisel Bakım","Borç/Kredi Ödemesi","Kredi Kartı","Verilen Borç","Diğer Gider"];
 const CAT_COLORS = {
-  "Market/Gıda":"#B98900","Kira/Aidat":"#A63D2F","Faturalar":"#3E5850","Ulaşım":"#7C7A2E",
-  "Sağlık":"#1F4E45","Eğitim":"#C97B4B","Giyim":"#6B4059","Ev Eşyası/Bakım":"#55606B",
-  "Eğlence/Sosyal":"#D1A23B","Kişisel Bakım":"#355E3B","Borç/Kredi Ödemesi":"#7A2E3B","Diğer Gider":"#9C8F73"
+  "Market/Gıda":"#B98900","Restoran/Kafe":"#B5652D","Kira/Aidat":"#A63D2F","Faturalar":"#3E5850","Abonelikler":"#4A6FA5",
+  "Ulaşım":"#7C7A2E","Sağlık":"#1F4E45","Sigorta":"#5B7065","Eğitim":"#C97B4B","Giyim":"#6B4059","Ev Eşyası/Bakım":"#55606B",
+  "Eğlence/Sosyal":"#D1A23B","Seyahat/Tatil":"#2F8F8A","Spor/Fitness":"#6B8E4E","Kişisel Bakım":"#355E3B",
+  "Borç/Kredi Ödemesi":"#7A2E3B","Kredi Kartı":"#8B5E3C","Verilen Borç":"#4C3B4E","Diğer Gider":"#9C8F73"
 };
 const FALLBACK_COLOR = "#8A8A8A";
 
