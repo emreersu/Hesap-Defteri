@@ -601,6 +601,16 @@
     <!-- AYARLAR -->
     <section id="screen-ayarlar" class="screen">
       <div class="section">
+        <div class="section-title">Ana Para Birimi</div>
+        <div class="section-sub">Yatırım toplamları (ve Özet'teki birincil bakiye) bu para biriminde gösterilir. Yurt dışına taşınırsan buradan değiştirebilirsin.</div>
+        <div class="method-toggle">
+          <button id="report-cur-try" class="active" onclick="setReportCurrency('TRY')">₺ TL</button>
+          <button id="report-cur-eur" onclick="setReportCurrency('EUR')">€ EUR</button>
+          <button id="report-cur-usd" onclick="setReportCurrency('USD')">$ USD</button>
+        </div>
+      </div>
+
+      <div class="section">
         <div class="section-title">Yedekleme</div>
         <div class="section-sub">Tüm kayıtlarını, tekrarlayan giderlerini ve ayarlarını tek dosyada indir; gerektiğinde geri yükle.</div>
         <button class="save-btn neutral small" onclick="exportData()">Dışa Aktar (JSON indir)</button>
@@ -670,17 +680,17 @@
     <section id="screen-yatirim" class="screen">
       <div class="invest-subtabs">
         <button id="inv-tab-fx" class="active" onclick="setInvestTab('fx')">Döviz &amp; Altın</button>
-        <button id="inv-tab-fund" onclick="setInvestTab('fund')">Fon &amp; Borsa</button>
+        <button id="inv-tab-fund" onclick="setInvestTab('fund')">Hisse &amp; Fon</button>
         <button id="inv-tab-save" onclick="setInvestTab('save')">Birikim</button>
       </div>
 
       <div class="invest-hero-row">
         <div class="invest-hero-card">
-          <div class="lbl">Toplam Yatırım (₺)</div>
+          <div class="lbl" id="inv-total-label">Toplam Yatırım</div>
           <div class="val" id="inv-total">₺0,00</div>
         </div>
         <div class="invest-hero-card">
-          <div class="lbl">Yatırım Geliri (₺)</div>
+          <div class="lbl" id="inv-income-label">Yatırım Geliri</div>
           <div class="val" id="inv-income">₺0,00</div>
         </div>
       </div>
@@ -749,30 +759,41 @@
         <div id="fx-list"></div>
       </div>
 
-      <!-- Fon & Borsa -->
+      <!-- Hisse & Fon -->
       <div id="inv-panel-fund" class="invest-panel" style="display:none;">
-        <div class="section-title">Yatırım Ekle</div>
-        <div class="field"><label>Ad (örn. Fon Kodu / Hisse)</label><input type="text" id="fund-name" placeholder="örn. VOO ETF"></div>
-        <div class="field">
+        <div class="section-title">Pozisyon Ekle (Alım)</div>
+        <div class="type-toggle" style="flex-wrap:wrap;">
+          <button id="pos-class-bist" class="active income" onclick="setPosClass('bist')" style="flex:1 1 30%;">BIST Hisse</button>
+          <button id="pos-class-yabanci" onclick="setPosClass('yabanci')" style="flex:1 1 30%;">Yabancı Hisse</button>
+          <button id="pos-class-fon" onclick="setPosClass('fon')" style="flex:1 1 30%;">Fon</button>
+        </div>
+
+        <div class="field" id="pos-currency-field" style="display:none;">
           <label>Para Birimi</label>
           <div class="method-toggle">
-            <button id="fund-cur-try" class="active" onclick="setFundCurrency('TRY')">₺ TL</button>
-            <button id="fund-cur-usd" onclick="setFundCurrency('USD')">$ USD</button>
-            <button id="fund-cur-eur" onclick="setFundCurrency('EUR')">€ EUR</button>
+            <button id="pos-cur-usd" class="active" onclick="setPosCurrency('USD')">$ USD</button>
+            <button id="pos-cur-eur" onclick="setPosCurrency('EUR')">€ EUR</button>
           </div>
         </div>
-        <div class="field"><label id="fund-principal-label">Yatırılan Tutar (₺)</label><input type="number" id="fund-principal" step="0.01" min="0"></div>
-        <div class="field"><label>Başlangıç Tarihi</label><input type="date" id="fund-date"></div>
-        <div class="field"><label id="fund-current-label">Güncel Değer (₺)</label><input type="number" id="fund-current" step="0.01" min="0"></div>
-        <button class="save-btn neutral small" onclick="addFundHolding()">Yatırım Ekle</button>
 
-        <div class="section-title" style="margin-top:10px;">Yatırımlarım</div>
-        <div class="section-sub">Bileşik yıllık getiri, yatırılan tutar / güncel değer / süreye göre otomatik hesaplanır. Bir kayda dokunarak güncel değerini güncelleyebilirsin.</div>
-        <div id="fund-list"></div>
+        <div class="field">
+          <label id="pos-symbol-label">Sembol (örn. EREGL)</label>
+          <input type="text" id="pos-symbol" placeholder="BIST'te / borsada listelendiği gibi yaz">
+        </div>
+        <div class="field"><label id="pos-lot-label">Lot / Adet</label><input type="number" id="pos-qty" step="0.0001" min="0"></div>
+        <div class="field"><label id="pos-price-label">Alış Fiyatı (₺, birim başı)</label><input type="number" id="pos-price" step="0.0001" min="0"></div>
+        <div class="field"><label>Alış Tarihi</label><input type="date" id="pos-date"></div>
+        <button class="save-btn neutral small" onclick="addPosition()">Alım Ekle</button>
+        <div class="section-sub">Aynı sembolü tekrar eklersen, mevcut pozisyona yeni bir alım olarak eklenir ve ağırlıklı ortalama maliyet otomatik güncellenir.</div>
+
+        <div class="section-title" style="margin-top:20px;">Pozisyonlarım</div>
+        <div class="section-sub">Bir pozisyona dokununca güncel fiyatı elle girebilir, satış yapabilir ya da fiyat çekmeyi deneyebilirsin.</div>
+        <div id="pos-list"></div>
+        <div id="portfolio-return"></div>
 
         <div class="section-title" style="margin-top:20px;">Temettü Takibi</div>
-        <div class="section-sub">Aldığın temettüleri kaydet — toplamı Yatırım Geliri'ne otomatik eklenir.</div>
-        <div class="field"><label>Hisse/Fon Adı</label><input type="text" id="div-name" placeholder="örn. VOO ETF"></div>
+        <div class="section-sub">Aldığın temettüleri kaydet — toplamı Yatırım Geliri'ne otomatik eklenir, şirket bazlı verim de altta görünür.</div>
+        <div class="field"><label>Hisse/Fon Adı (sembol)</label><input type="text" id="div-name" placeholder="örn. EREGL"></div>
         <div class="field">
           <label>Para Birimi</label>
           <div class="method-toggle">
@@ -795,6 +816,7 @@
               <button id="calc-mode-lump" onclick="setCalcMode('lump')">Tek Seferlik</button>
             </div>
           </div>
+          <div class="field"><label>Başlangıç Tutarı (₺, opsiyonel)</label><input type="number" id="calc-initial" step="0.01" min="0" oninput="renderFundCalc()"></div>
           <div class="field"><label id="calc-principal-label">Aylık Yatırım Tutarı (₺)</label><input type="number" id="calc-principal" step="0.01" min="0" oninput="renderFundCalc()"></div>
           <div class="field"><label>Beklenen Yıllık Getiri (%)</label><input type="number" id="calc-rate" step="0.1" oninput="renderFundCalc()"></div>
           <div class="field"><label>Vade (yıl)</label><input type="number" id="calc-term" step="0.5" min="0" oninput="renderFundCalc()"></div>
@@ -808,13 +830,15 @@
       <!-- Birikim -->
       <div id="inv-panel-save" class="invest-panel" style="display:none;">
         <div class="section-title">Birikim Hedefi</div>
-        <div class="field"><label>Hedef Tutar (₺)</label><input type="number" id="save-target" step="0.01" min="0" oninput="renderSavings()"></div>
+        <div class="section-sub">İlerleme, elindeki tüm yatırımların (döviz, altın, hisse, fon) güncel toplamından otomatik hesaplanır — istersen üstüne yatırım dışı (banka/nakit) birikimini de ekleyebilirsin.</div>
+        <div class="field"><label>Hedef Tutar</label><input type="number" id="save-target" step="0.01" min="0" oninput="renderSavings()"></div>
         <div class="field"><label>Hedef Tarih</label><input type="date" id="save-date" oninput="renderSavings()"></div>
-        <div class="field"><label>Güncel Birikim (₺)</label><input type="number" id="save-current" step="0.01" min="0" oninput="renderSavings()"></div>
+        <div class="field"><label>Ek Nakit / Banka Birikimi (yatırım dışı)</label><input type="number" id="save-extra" step="0.01" min="0" placeholder="0" oninput="renderInvestTotals()"></div>
         <button class="save-btn neutral small" onclick="saveSavingsGoal()">Kaydet</button>
 
         <div class="calc-card">
-          <div class="calc-result-row" style="border-top:none;margin-top:0;"><span class="lbl">İlerleme</span><span class="val" id="save-progress">%0</span></div>
+          <div class="calc-result-row" style="border-top:none;margin-top:0;"><span class="lbl">Toplam Servet (Yatırım + Nakit)</span><span class="val" id="save-wealth">₺0,00</span></div>
+          <div class="calc-result-row"><span class="lbl">İlerleme</span><span class="val" id="save-progress">%0</span></div>
           <div class="cat-track" style="margin:6px 0 14px;"><div class="cat-fill" id="save-bar" style="width:0%;background:var(--green);"></div></div>
           <div class="calc-result-row"><span class="lbl">Kalan Tutar</span><span class="val" id="save-remaining">₺0,00</span></div>
           <div class="calc-result-row"><span class="lbl">Kalan Gün</span><span class="val" id="save-days">—</span></div>
@@ -864,6 +888,7 @@ const K_SETTINGS = "butce_settings";
 const K_IOS_HINT = "butce_ios_hint_dismissed";
 const K_INV_FX = "butce_inv_fx";
 const K_INV_FUND = "butce_inv_fund";
+const K_INV_POS = "butce_inv_positions";
 const K_INV_SAVE = "butce_inv_save";
 const K_INV_RATES = "butce_inv_rates";
 const K_INV_DIV = "butce_inv_dividends";
@@ -871,10 +896,11 @@ const K_INV_DIV = "butce_inv_dividends";
 let entries = [];
 let recurring = [];
 let budgets = {};
-let settings = { eurRate: null, initialBalanceTRY: 0, initialBalanceEUR: 0 };
+let settings = { eurRate: null, initialBalanceTRY: 0, initialBalanceEUR: 0, reportCurrency: 'TRY' };
 let invFx = [];         // [{id, kind:'doviz'|'altin', currency, goldType, qty, cost, date}]
-let invFund = [];       // [{id, name, principal, date, current}]
-let invSave = { target: 0, date: '', current: 0 };
+let invFund = [];       // eski format — sadece geçiş/taşıma için tutulur
+let invPositions = [];  // [{id, assetClass, symbol, currency, lots:[{id,date,qty,price,remainingQty}], sales:[{id,date,qty,price,realizedPL}], currentPrice, lastPriceUpdate}]
+let invSave = { target: 0, date: '', extra: 0 };
 let invRates = { usd: null, eur: null, gold24: null, lastFetched: null };
 let invDividends = []; // [{id, name, date, amount, currency}]
 let currentFxType = 'doviz';
@@ -913,19 +939,40 @@ function loadAll(){
   entries.forEach(e => { if(!e.currency) e.currency = 'TRY'; });
   recurring = safeParse(localStorage.getItem(K_RECURRING), []);
   budgets = safeParse(localStorage.getItem(K_BUDGETS), {});
-  settings = safeParse(localStorage.getItem(K_SETTINGS), { eurRate: null, initialBalanceTRY: 0, initialBalanceEUR: 0 });
+  settings = safeParse(localStorage.getItem(K_SETTINGS), { eurRate: null, initialBalanceTRY: 0, initialBalanceEUR: 0, reportCurrency: 'TRY' });
   invFx = safeParse(localStorage.getItem(K_INV_FX), []);
   invFund = safeParse(localStorage.getItem(K_INV_FUND), []);
-  invFund.forEach(f => {
-    // migrate older single-purchase records (principal/date) into the purchases[] model
-    if(!Array.isArray(f.purchases)){
-      f.purchases = [{ id: uid(), date: f.date || todayISO(), amount: f.principal || 0, rate: null }];
-      delete f.principal;
-      delete f.date;
-    }
-    if(!f.currency) f.currency = 'TRY';
+  invPositions = safeParse(localStorage.getItem(K_INV_POS), null);
+  if(invPositions === null){
+    // İlk yükleme: eski "Fon & Borsa" (tutar bazlı) kayıtları varsa, yeni lot
+    // sistemine bire-bir para değeri korunarak taşınır (adet burada kurgusaldır,
+    // eski kayıtlarda gerçek lot/adet bilgisi hiç tutulmuyordu).
+    invPositions = invFund.map(f => {
+      const purchases = Array.isArray(f.purchases) ? f.purchases
+        : [{ date: f.date || todayISO(), amount: f.principal || 0 }];
+      const totalQty = purchases.length || 1;
+      const lots = purchases.map(p => ({
+        id: uid(), date: p.date, qty: 1, price: p.amount, remainingQty: 1
+      }));
+      const totalPaid = purchases.reduce((s,p) => s + p.amount, 0);
+      return {
+        id: f.id || uid(), assetClass: 'fon', symbol: f.name || 'Taşınan Kayıt',
+        currency: f.currency || 'TRY', lots,
+        sales: [], currentPrice: totalQty > 0 ? (f.current || totalPaid) / totalQty : 0,
+        lastPriceUpdate: null,
+      };
+    });
+    if(invPositions.length > 0) persistInvPositions();
+  }
+  invPositions.forEach(p => {
+    if(!Array.isArray(p.sales)) p.sales = [];
+    if(!p.currency) p.currency = 'TRY';
   });
-  invSave = safeParse(localStorage.getItem(K_INV_SAVE), { target: 0, date: '', current: 0 });
+  invSave = safeParse(localStorage.getItem(K_INV_SAVE), { target: 0, date: '', extra: 0 });
+  if(invSave.extra === undefined && invSave.current !== undefined){
+    invSave.extra = invSave.current; // eski "Güncel Birikim" alanı artık "Ek Nakit Birikim"
+    delete invSave.current;
+  }
   invRates = safeParse(localStorage.getItem(K_INV_RATES), { usd: null, eur: null, gold24: null, lastFetched: null });
   invDividends = safeParse(localStorage.getItem(K_INV_DIV), []);
 }
@@ -935,6 +982,7 @@ function persistBudgets(){ try{ localStorage.setItem(K_BUDGETS, JSON.stringify(b
 function persistSettings(){ try{ localStorage.setItem(K_SETTINGS, JSON.stringify(settings)); }catch(e){} }
 function persistInvFx(){ try{ localStorage.setItem(K_INV_FX, JSON.stringify(invFx)); }catch(e){} }
 function persistInvFund(){ try{ localStorage.setItem(K_INV_FUND, JSON.stringify(invFund)); }catch(e){} }
+function persistInvPositions(){ try{ localStorage.setItem(K_INV_POS, JSON.stringify(invPositions)); }catch(e){} }
 function persistInvSave(){ try{ localStorage.setItem(K_INV_SAVE, JSON.stringify(invSave)); }catch(e){} }
 function persistInvRates(){ try{ localStorage.setItem(K_INV_RATES, JSON.stringify(invRates)); }catch(e){} }
 function persistInvDividends(){ try{ localStorage.setItem(K_INV_DIV, JSON.stringify(invDividends)); }catch(e){} }
@@ -1438,6 +1486,10 @@ function renderAyarlar(){
   document.getElementById('f-eurrate').value = settings.eurRate || '';
   document.getElementById('f-initbal-try').value = settings.initialBalanceTRY || '';
   document.getElementById('f-initbal-eur').value = settings.initialBalanceEUR || '';
+  const rc = settings.reportCurrency || 'TRY';
+  document.getElementById('report-cur-try').classList.toggle('active', rc==='TRY');
+  document.getElementById('report-cur-eur').classList.toggle('active', rc==='EUR');
+  document.getElementById('report-cur-usd').classList.toggle('active', rc==='USD');
 
   const budgetListEl = document.getElementById('budget-list');
   budgetListEl.innerHTML = GIDER_KATEGORILERI.map(cat => `
@@ -1525,7 +1577,7 @@ function saveEurRate(){
 
 // ---------- export / import ----------
 function exportData(){
-  const payload = { entries, recurring, budgets, settings, invFx, invFund, invSave, invDividends, exportedAt: new Date().toISOString(), version: 3 };
+  const payload = { entries, recurring, budgets, settings, invFx, invPositions, invSave, invDividends, exportedAt: new Date().toISOString(), version: 4 };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1551,20 +1603,17 @@ function importData(event){
       entries.forEach(e => { if(!e.currency) e.currency = 'TRY'; });
       recurring = Array.isArray(data.recurring) ? data.recurring : [];
       budgets = (data.budgets && typeof data.budgets === 'object') ? data.budgets : {};
-      settings = (data.settings && typeof data.settings === 'object') ? data.settings : { eurRate: null, initialBalanceTRY: 0, initialBalanceEUR: 0 };
+      settings = (data.settings && typeof data.settings === 'object') ? data.settings : { eurRate: null, initialBalanceTRY: 0, initialBalanceEUR: 0, reportCurrency: 'TRY' };
       invFx = Array.isArray(data.invFx) ? data.invFx : [];
-      invFund = Array.isArray(data.invFund) ? data.invFund : [];
-      invFund.forEach(f => {
-        if(!Array.isArray(f.purchases)){
-          f.purchases = [{ id: uid(), date: f.date || todayISO(), amount: f.principal || 0, rate: null }];
-          delete f.principal; delete f.date;
-        }
-        if(!f.currency) f.currency = 'TRY';
+      invPositions = Array.isArray(data.invPositions) ? data.invPositions : [];
+      invPositions.forEach(p => {
+        if(!Array.isArray(p.sales)) p.sales = [];
+        if(!p.currency) p.currency = 'TRY';
       });
-      invSave = (data.invSave && typeof data.invSave === 'object') ? data.invSave : { target: 0, date: '', current: 0 };
+      invSave = (data.invSave && typeof data.invSave === 'object') ? data.invSave : { target: 0, date: '', extra: 0 };
       invDividends = Array.isArray(data.invDividends) ? data.invDividends : [];
       persistEntries(); persistRecurring(); persistBudgets(); persistSettings();
-      persistInvFx(); persistInvFund(); persistInvSave(); persistInvDividends();
+      persistInvFx(); persistInvPositions(); persistInvSave(); persistInvDividends();
       renderAyarlar();
       showToast('Yedek başarıyla yüklendi');
     }catch(e){
@@ -1599,12 +1648,12 @@ function setInvestTab(tab){
 
 function renderInvestmentsScreen(){
   document.getElementById('fx-date').value = document.getElementById('fx-date').value || todayISO();
-  document.getElementById('fund-date').value = document.getElementById('fund-date').value || todayISO();
+  document.getElementById('pos-date').value = document.getElementById('pos-date').value || todayISO();
   document.getElementById('div-date').value = document.getElementById('div-date').value || todayISO();
   populateGoldTypes();
   renderRateInputsFromCache();
   renderInvestments();   // fx list + totals
-  renderFundList();
+  renderPositionsList();
   renderDividendList();
   renderFundCalc();
   loadSavingsIntoForm();
@@ -1651,6 +1700,29 @@ function toTRY(amount, currency){
   if(currency === 'EUR') return amount * (invRates.eur || 0);
   return amount;
 }
+
+// Converts any amount (in its own currency) into the user's chosen "Ana Para
+// Birimi" — pivots through TRY since that's what our live rates are quoted in.
+function toReportCurrency(amount, fromCurrency){
+  const rc = settings.reportCurrency || 'TRY';
+  const tryAmount = toTRY(amount, fromCurrency);
+  if(rc === 'TRY') return tryAmount;
+  if(rc === 'EUR') return invRates.eur ? tryAmount / invRates.eur : 0;
+  if(rc === 'USD') return invRates.usd ? tryAmount / invRates.usd : 0;
+  return tryAmount;
+}
+function reportCurrency(){ return settings.reportCurrency || 'TRY'; }
+
+function setReportCurrency(cur){
+  settings.reportCurrency = cur;
+  persistSettings();
+  document.getElementById('report-cur-try').classList.toggle('active', cur==='TRY');
+  document.getElementById('report-cur-eur').classList.toggle('active', cur==='EUR');
+  document.getElementById('report-cur-usd').classList.toggle('active', cur==='USD');
+  renderInvestTotals();
+  renderSavings();
+}
+
 // ---------- Yatırım: canlı kur/altın çekme ----------
 function renderRateInputsFromCache(){
   document.getElementById('rate-usd').value = invRates.usd || '';
@@ -1690,13 +1762,26 @@ async function fetchLiveRates(silent){
     }
   }catch(e){ /* ignore */ }
 
+  // Altın: önce xaus.com (CORS'u açıkça belgeli, TRY/gram doğrudan destekliyor),
+  // başarısız olursa goldprice.dev'i dener.
   try{
-    const r = await fetch('https://api.goldprice.dev/v1/carat?currency=TRY');
+    const r = await fetch('https://xaus.com/api/v1/spot?currency=TRY&unit=gram');
     if(r.ok){
       const d = await r.json();
-      if(d && d.price_gram_24k){ invRates.gold24 = parseFloat(d.price_gram_24k); goldOk = true; }
+      const price = d?.xau?.price;
+      if(isFinite(price) && price > 0){ invRates.gold24 = price; goldOk = true; }
     }
-  }catch(e){ /* ignore */ }
+  }catch(e){ /* ignore, try fallback */ }
+
+  if(!goldOk){
+    try{
+      const r = await fetch('https://api.goldprice.dev/v1/carat?currency=TRY');
+      if(r.ok){
+        const d = await r.json();
+        if(d && d.price_gram_24k){ invRates.gold24 = parseFloat(d.price_gram_24k); goldOk = true; }
+      }
+    }catch(e){ /* ignore */ }
+  }
 
   if(usdOk || eurOk || goldOk){
     invRates.lastFetched = new Date().toISOString();
@@ -1818,152 +1903,216 @@ function currentRateFor(currency){
   return 1;
 }
 
-async function addFundHolding(){
-  const name = document.getElementById('fund-name').value.trim();
-  const principal = parseFloat(document.getElementById('fund-principal').value);
-  const date = document.getElementById('fund-date').value || todayISO();
-  const current = parseFloat(document.getElementById('fund-current').value);
-  if(!name){ document.getElementById('fund-name').focus(); return; }
-  if(!principal || principal <= 0){ document.getElementById('fund-principal').focus(); return; }
-  if(!isFinite(current) || current < 0){ document.getElementById('fund-current').focus(); return; }
+// ---------- Yatırım: Hisse & Fon (lot bazlı, alım-satım) ----------
+const ASSET_CLASS_LABEL = { bist: 'BIST Hisse', yabanci: 'Yabancı Hisse', fon: 'Fon' };
+let currentPosClass = 'bist';
+let currentPosCurrency = 'USD';
 
-  const currency = currentFundCurrency;
-  const rate = await fetchHistoricalRate(currency, date);
-  const holding = {
-    id: uid(), name, currency, current,
-    purchases: [{ id: uid(), date, amount: principal, rate }],
-  };
-  invFund.unshift(holding);
-  persistInvFund();
-
-  document.getElementById('fund-name').value = '';
-  document.getElementById('fund-principal').value = '';
-  document.getElementById('fund-current').value = '';
-  showToast('Yatırım eklendi');
-  renderFundList();
-  renderInvestTotals();
-  renderFundCalc();
+function setPosClass(cls){
+  currentPosClass = cls;
+  document.getElementById('pos-class-bist').classList.toggle('active', cls==='bist');
+  document.getElementById('pos-class-yabanci').classList.toggle('active', cls==='yabanci');
+  document.getElementById('pos-class-fon').classList.toggle('active', cls==='fon');
+  document.getElementById('pos-currency-field').style.display = cls==='yabanci' ? 'block' : 'none';
+  const cur = cls==='yabanci' ? currentPosCurrency : 'TRY';
+  const sym = cur==='USD' ? '$' : (cur==='EUR' ? '€' : '₺');
+  document.getElementById('pos-symbol-label').textContent = cls==='fon' ? 'Fon Kodu (örn. AFT)' : 'Sembol (borsada listelendiği gibi)';
+  document.getElementById('pos-lot-label').textContent = cls==='fon' ? 'Pay Adedi' : 'Lot / Adet';
+  document.getElementById('pos-price-label').textContent = `Alış Fiyatı (${sym}, birim başı)`;
 }
 
-async function addFundPurchase(id){
-  const f = invFund.find(x => x.id === id);
-  if(!f) return;
-  const dateInput = window.prompt('Yeni alım tarihi (YYYY-AA-GG):', todayISO());
-  if(dateInput === null) return;
-  const amountInput = window.prompt(`Yeni alım tutarı (${f.currency}):`, '');
-  if(amountInput === null) return;
-  const amount = parseFloat(amountInput);
-  if(!isFinite(amount) || amount <= 0){ showToast('Geçersiz tutar'); return; }
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(dateInput) ? dateInput : todayISO();
+function setPosCurrency(cur){
+  currentPosCurrency = cur;
+  document.getElementById('pos-cur-usd').classList.toggle('active', cur==='USD');
+  document.getElementById('pos-cur-eur').classList.toggle('active', cur==='EUR');
+  setPosClass(currentPosClass);
+}
 
-  const rate = await fetchHistoricalRate(f.currency, date);
-  f.purchases.push({ id: uid(), date, amount, rate });
-  persistInvFund();
+function positionCurrency(p){
+  if(p.assetClass === 'yabanci') return p.currency;
+  return 'TRY';
+}
+
+async function addPosition(){
+  const symbol = document.getElementById('pos-symbol').value.trim().toUpperCase();
+  const qty = parseFloat(document.getElementById('pos-qty').value);
+  const price = parseFloat(document.getElementById('pos-price').value);
+  const date = document.getElementById('pos-date').value || todayISO();
+  if(!symbol){ document.getElementById('pos-symbol').focus(); return; }
+  if(!qty || qty <= 0){ document.getElementById('pos-qty').focus(); return; }
+  if(!isFinite(price) || price <= 0){ document.getElementById('pos-price').focus(); return; }
+
+  const currency = currentPosClass === 'yabanci' ? currentPosCurrency : 'TRY';
+  let p = invPositions.find(x => x.assetClass === currentPosClass && x.symbol === symbol && x.currency === currency);
+  if(!p){
+    p = { id: uid(), assetClass: currentPosClass, symbol, currency, lots: [], sales: [], currentPrice: price, lastPriceUpdate: null };
+    invPositions.unshift(p);
+  }
+  p.lots.push({ id: uid(), date, qty, price, remainingQty: qty });
+  persistInvPositions();
+
+  document.getElementById('pos-symbol').value = '';
+  document.getElementById('pos-qty').value = '';
+  document.getElementById('pos-price').value = '';
   showToast('Alım eklendi');
-  renderFundList();
+  renderPositionsList();
   renderInvestTotals();
 }
 
-function deleteFundHolding(id){
-  invFund = invFund.filter(f => f.id !== id);
-  persistInvFund();
-  renderFundList();
+// FIFO: en eski açık lot'tan başlayarak satışı düşer, gerçekleşmiş K/Z hesaplar.
+function sellFromPosition(posId, qty, price, date){
+  const p = invPositions.find(x => x.id === posId);
+  if(!p) return { ok:false, msg:'Pozisyon bulunamadı' };
+  const openQty = positionOpenQty(p);
+  if(qty > openQty + 1e-9) return { ok:false, msg:`Elinde sadece ${openQty} adet var` };
+
+  let remaining = qty;
+  let realized = 0;
+  for(const lot of p.lots){
+    if(remaining <= 0) break;
+    if(lot.remainingQty <= 0) continue;
+    const match = Math.min(remaining, lot.remainingQty);
+    realized += (price - lot.price) * match;
+    lot.remainingQty -= match;
+    remaining -= match;
+  }
+  p.sales.push({ id: uid(), date, qty, price, realizedPL: realized });
+  persistInvPositions();
+  return { ok:true, realized };
+}
+
+function positionOpenLots(p){ return p.lots.filter(l => l.remainingQty > 1e-9); }
+function positionOpenQty(p){ return p.lots.reduce((s,l) => s + l.remainingQty, 0); }
+function positionTotalLotQty(p){ return p.lots.reduce((s,l) => s + l.qty, 0); } // tüm zamanlar (satılan dahil)
+function positionOpenCostBasis(p){ return p.lots.reduce((s,l) => s + l.remainingQty * l.price, 0); }
+function positionTotalCostAllTime(p){ return p.lots.reduce((s,l) => s + l.qty * l.price, 0); }
+function positionWeightedAvgCost(p){
+  const q = positionOpenQty(p);
+  return q > 0 ? positionOpenCostBasis(p) / q : 0;
+}
+function positionRealizedPL(p){ return p.sales.reduce((s,sale) => s + sale.realizedPL, 0); }
+function positionUnrealizedPL(p){
+  const q = positionOpenQty(p);
+  const price = p.currentPrice || 0;
+  return (price - positionWeightedAvgCost(p)) * q;
+}
+function positionMarketValue(p){ return (p.currentPrice || 0) * positionOpenQty(p); }
+
+function deletePosition(id){
+  invPositions = invPositions.filter(p => p.id !== id);
+  persistInvPositions();
+  renderPositionsList();
   renderInvestTotals();
 }
 
-function editFundCurrentValue(id){
-  const f = invFund.find(x => x.id === id);
-  if(!f) return;
-  const input = window.prompt(`${f.name} için güncel değeri gir (${f.currency}):`, f.current);
+function updatePositionPrice(id){
+  const p = invPositions.find(x => x.id === id);
+  if(!p) return;
+  const input = window.prompt(`${p.symbol} için güncel fiyatı gir (${p.currency}, birim başı):`, p.currentPrice || '');
   if(input === null) return;
   const val = parseFloat(input);
   if(!isFinite(val) || val < 0) return;
-  f.current = val;
-  persistInvFund();
-  renderFundList();
+  p.currentPrice = val;
+  p.lastPriceUpdate = new Date().toISOString();
+  persistInvPositions();
+  renderPositionsList();
   renderInvestTotals();
 }
 
-// ---------- Fon & Borsa: çoklu alım yardımcıları ----------
-function fundPrincipal(f){
-  return f.purchases.reduce((s,p) => s + p.amount, 0);
-}
-function fundPrincipalTRY(f){
-  return f.purchases.reduce((s,p) => s + p.amount * (p.rate || currentRateFor(f.currency)), 0);
-}
-// Dollar-weighted average holding period across all purchases (approximation used
-// in place of a full XIRR solve — accurate enough for a personal tracker).
-function fundWeightedYears(f){
-  const principal = fundPrincipal(f);
-  if(principal <= 0) return 0;
-  const today = new Date(todayISO());
-  const weightedDays = f.purchases.reduce((s,p) => {
-    const days = Math.max((today - new Date(p.date)) / 86400000, 0);
-    return s + p.amount * days;
-  }, 0);
-  return (weightedDays / principal) / 365.25;
-}
-function fundCAGR(f){
-  const principal = fundPrincipal(f);
-  const years = fundWeightedYears(f);
-  if(years * 365.25 < 7 || principal <= 0) return null;
-  return (Math.pow(f.current / principal, 1/years) - 1) * 100;
-}
-// Currency-effect decomposition for a foreign-currency holding: how much of the
-// TRY-terms return came from the asset itself vs. TRY depreciation/appreciation.
-function fundFxEffect(f){
-  if(f.currency === 'TRY') return null;
-  const principal = fundPrincipal(f);
-  const principalTRY = fundPrincipalTRY(f);
-  if(principal <= 0 || principalTRY <= 0) return null;
-  const hasAnyRate = f.purchases.some(p => p.rate);
-  if(!hasAnyRate) return null;
+function sellPosition(id){
+  const p = invPositions.find(x => x.id === id);
+  if(!p) return;
+  const openQty = positionOpenQty(p);
+  if(openQty <= 0){ showToast('Satılacak açık pozisyon yok'); return; }
+  const qtyInput = window.prompt(`${p.symbol} — kaç adet/lot satıyorsun? (elinde ${openQty})`, openQty);
+  if(qtyInput === null) return;
+  const qty = parseFloat(qtyInput);
+  if(!isFinite(qty) || qty <= 0){ showToast('Geçersiz miktar'); return; }
+  const priceInput = window.prompt(`Satış fiyatı (${p.currency}, birim başı):`, p.currentPrice || '');
+  if(priceInput === null) return;
+  const price = parseFloat(priceInput);
+  if(!isFinite(price) || price <= 0){ showToast('Geçersiz fiyat'); return; }
+  const dateInput = window.prompt('Satış tarihi (YYYY-AA-GG):', todayISO());
+  if(dateInput === null) return;
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(dateInput) ? dateInput : todayISO();
 
-  const currentTRY = f.current * currentRateFor(f.currency);
-  const assetReturnPct = (f.current / principal - 1) * 100;
-  const tryReturnPct = (currentTRY / principalTRY - 1) * 100;
-  const fxReturnPct = ((1 + tryReturnPct/100) / (1 + assetReturnPct/100) - 1) * 100;
-  return { assetReturnPct, fxReturnPct, tryReturnPct };
+  const res = sellFromPosition(id, qty, price, date);
+  if(!res.ok){ showToast(res.msg); return; }
+  showToast(`Satıldı — gerçekleşmiş K/Z: ${fmt(res.realized, p.currency)}`);
+  renderPositionsList();
+  renderInvestTotals();
 }
 
-function renderFundList(){
-  const listEl = document.getElementById('fund-list');
-  if(invFund.length === 0){
-    listEl.innerHTML = '<div class="empty-note">Henüz fon/borsa yatırımı eklenmedi.</div>';
+// Deneysel: Yahoo Finance'in resmi olmayan uç noktası üzerinden fiyat çekmeyi dener.
+// Yahoo bu erişimi resmi desteklemiyor — çalışabilir de çalışmayabilir de; başarısız
+// olursa sessizce elle girişe düşülür, uygulama asla bozulmaz.
+async function tryFetchPositionPrice(id){
+  const p = invPositions.find(x => x.id === id);
+  if(!p) return;
+  const ySymbol = p.assetClass === 'bist' ? `${p.symbol}.IS` : p.symbol;
+  showToast('Fiyat çekiliyor (deneysel)...');
+  try{
+    const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ySymbol)}`);
+    if(r.ok){
+      const d = await r.json();
+      const price = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
+      if(isFinite(price) && price > 0){
+        p.currentPrice = price;
+        p.lastPriceUpdate = new Date().toISOString();
+        persistInvPositions();
+        renderPositionsList();
+        renderInvestTotals();
+        showToast(`${p.symbol}: ${fmt(price, p.currency)} olarak güncellendi`);
+        return;
+      }
+    }
+    throw new Error('no price');
+  }catch(e){
+    showToast('Otomatik çekilemedi — elle girmen gerekiyor');
+  }
+}
+
+function renderPositionsList(){
+  const listEl = document.getElementById('pos-list');
+  if(invPositions.length === 0){
+    listEl.innerHTML = '<div class="empty-note">Henüz pozisyon eklenmedi.</div>';
+    renderPortfolioReturn();
     return;
   }
-  listEl.innerHTML = invFund.map(f => {
-    const cur = f.currency || 'TRY';
-    const principal = fundPrincipal(f);
-    const gain = f.current - principal;
-    const cagr = fundCAGR(f);
-    const cagrText = cagr === null ? 'yeni — henüz hesaplanmadı' : `bileşik getiri: ${cagr>=0?'+':''}${cagr.toFixed(1)}%/yıl`;
-    const purchaseCount = f.purchases.length;
-    const purchaseTag = purchaseCount > 1 ? ` · ${purchaseCount} alım` : '';
-    const tryEquivalent = cur !== 'TRY' ? `<div class="holding-meta">≈ ${fmt(toTRY(f.current, cur),'TRY')}</div>` : '';
-
-    const fx = fundFxEffect(f);
-    let fxHtml = '';
-    if(fx){
-      fxHtml = `<div class="holding-meta">Varlık: ${fx.assetReturnPct>=0?'+':''}${fx.assetReturnPct.toFixed(1)}% · Kur: ${fx.fxReturnPct>=0?'+':''}${fx.fxReturnPct.toFixed(1)}% · TL Toplam: ${fx.tryReturnPct>=0?'+':''}${fx.tryReturnPct.toFixed(1)}%</div>`;
-    }
+  listEl.innerHTML = invPositions.map(p => {
+    const cur = positionCurrency(p);
+    const openQty = positionOpenQty(p);
+    const avgCost = positionWeightedAvgCost(p);
+    const unrealized = positionUnrealizedPL(p);
+    const realized = positionRealizedPL(p);
+    const marketVal = positionMarketValue(p);
+    const lotCount = p.lots.length;
+    const soldTag = p.sales.length > 0 ? ` · ${p.sales.length} satış` : '';
+    const tryEquivalent = cur !== 'TRY' ? `<div class="holding-meta">≈ ${fmt(toTRY(marketVal,cur),'TRY')}</div>` : '';
+    const unrealizedPct = avgCost > 0 ? (unrealized / (avgCost*openQty)) * 100 : 0;
 
     return `
       <div class="holding-row">
-        <div class="holding-main" onclick="editFundCurrentValue('${f.id}')" style="cursor:pointer;">
-          <div class="holding-title">📈 ${escapeHtml(f.name)}${cur!=='TRY' ? ' <span style="color:var(--ink-soft);font-size:11px;">('+cur+')</span>' : ''}</div>
-          <div class="holding-meta">yatırılan ${fmt(principal,cur)} · ${cagrText}${purchaseTag}</div>
-          ${fxHtml}
+        <div class="holding-main">
+          <div class="holding-title">${p.assetClass==='fon'?'📊':'📈'} ${escapeHtml(p.symbol)} <span style="color:var(--ink-soft);font-size:11px;">(${ASSET_CLASS_LABEL[p.assetClass]}${cur!=='TRY'?', '+cur:''})</span></div>
+          <div class="holding-meta">${openQty} adet açık · ort. maliyet ${fmt(avgCost,cur)}${soldTag}${lotCount>1?` · ${lotCount} alım`:''}</div>
+          ${p.lastPriceUpdate ? `<div class="holding-meta">fiyat güncelleme: ${formatDate(p.lastPriceUpdate.slice(0,10))}</div>` : ''}
         </div>
         <div class="holding-val">
-          <div class="amt">${fmt(f.current,cur)}</div>
-          <div class="gain ${gain>=0?'positive':'negative'}">${gain>=0?'+':''}${fmt(gain,cur)}</div>
+          <div class="amt">${fmt(marketVal,cur)}</div>
+          <div class="gain ${unrealized>=0?'positive':'negative'}">${unrealized>=0?'+':''}${fmt(unrealized,cur)} (${unrealizedPct>=0?'+':''}${unrealizedPct.toFixed(1)}%)</div>
+          ${realized !== 0 ? `<div class="gain ${realized>=0?'positive':'negative'}">gerçekleşmiş: ${realized>=0?'+':''}${fmt(realized,cur)}</div>` : ''}
           ${tryEquivalent}
-          <button class="refresh-btn" style="padding:4px 10px;font-size:11px;margin-top:4px;" onclick="event.stopPropagation(); addFundPurchase('${f.id}')">+ Alım</button>
         </div>
-        <button class="tx-del" onclick="event.stopPropagation(); deleteFundHolding('${f.id}')">✕</button>
+      </div>
+      <div style="display:flex;gap:6px;margin:-6px 0 10px;padding-left:0;">
+        <button class="refresh-btn" style="flex:1;padding:6px 4px;font-size:11px;" onclick="updatePositionPrice('${p.id}')">Fiyat Gir</button>
+        <button class="refresh-btn" style="flex:1;padding:6px 4px;font-size:11px;" onclick="tryFetchPositionPrice('${p.id}')">Fiyat Çek (deneysel)</button>
+        <button class="refresh-btn" style="flex:1;padding:6px 4px;font-size:11px;" onclick="sellPosition('${p.id}')">Sat</button>
+        <button class="tx-del" onclick="deletePosition('${p.id}')">✕</button>
       </div>`;
   }).join('');
+  renderPortfolioReturn();
 }
 
 // ---------- Fon & Borsa: Temettü ----------
@@ -2009,8 +2158,26 @@ function renderDividendList(){
     return;
   }
   const total = invDividends.reduce((s,d) => s + toTRY(d.amount, d.currency||'TRY'), 0);
+
+  // Şirket bazlı verim: o şirketten alınan toplam temettü ÷ o şirkete yatırılan
+  // toplam sermaye (tüm zamanlar, açık + satılmış lotlar dahil).
+  const byCompany = {};
+  invDividends.forEach(d => {
+    const key = d.name.trim().toUpperCase();
+    byCompany[key] = (byCompany[key] || 0) + toTRY(d.amount, d.currency||'TRY');
+  });
+  const yieldRows = Object.keys(byCompany).map(symbol => {
+    const pos = invPositions.find(p => p.symbol === symbol);
+    if(!pos) return null;
+    const capital = toTRY(positionTotalCostAllTime(pos), positionCurrency(pos));
+    if(capital <= 0) return null;
+    const pct = (byCompany[symbol] / capital) * 100;
+    return `<div class="legend-row" style="margin-bottom:4px;"><span class="lbl">${symbol} temettü verimi</span><span class="amt">${pct.toFixed(1)}%</span></div>`;
+  }).filter(Boolean).join('');
+
   listEl.innerHTML =
     `<div class="section-sub" style="margin-top:12px;">Toplam temettü: <b style="color:var(--ink);">${fmt(total,'TRY')}</b></div>` +
+    (yieldRows ? `<div style="margin:8px 0;">${yieldRows}</div>` : '') +
     invDividends.map(d => `
       <div class="div-row">
         <div class="div-main">
@@ -2039,13 +2206,14 @@ function buildDonutSVG(dataArr, size, thickness){
   return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${segs}</svg>`;
 }
 
-function renderAllocationChart(fxTotal, fundTotal, saveCurrent){
+function renderAllocationChart(fxTotal, fundTotal, extraSavings){
   const el = document.getElementById('allocation-chart');
   const sectionEl = document.getElementById('allocation-section');
+  const rc = reportCurrency();
   const data = [
     { label: 'Döviz & Altın', value: fxTotal, color: '#B98900' },
-    { label: 'Fon & Borsa', value: fundTotal, color: '#3E5850' },
-    { label: 'Birikim', value: saveCurrent, color: '#A63D2F' },
+    { label: 'Hisse & Fon', value: fundTotal, color: '#3E5850' },
+    { label: 'Nakit Birikim', value: extraSavings, color: '#A63D2F' },
   ].filter(d => d.value > 0);
 
   if(data.length === 0){
@@ -2059,7 +2227,7 @@ function renderAllocationChart(fxTotal, fundTotal, saveCurrent){
     <div class="alloc-legend-row">
       <span class="alloc-dot" style="background:${d.color};"></span>
       <span class="lbl">${d.label} (${(d.value/total*100).toFixed(0)}%)</span>
-      <span class="amt">${fmt(d.value,'TRY')}</span>
+      <span class="amt">${fmt(d.value,rc)}</span>
     </div>`).join('');
   el.innerHTML = `<div class="alloc-donut-wrap">${svg}<div class="alloc-legend">${legend}</div></div>`;
 }
@@ -2075,6 +2243,7 @@ function setCalcMode(mode){
 }
 
 function renderFundCalc(){
+  const initial = parseFloat(document.getElementById('calc-initial').value) || 0;
   const principal = parseFloat(document.getElementById('calc-principal').value);
   const rate = parseFloat(document.getElementById('calc-rate').value);
   const term = parseFloat(document.getElementById('calc-term').value);
@@ -2093,7 +2262,9 @@ function renderFundCalc(){
     doubleEl.textContent = years.toFixed(1) + ' yıl';
   }
 
-  if(!(isFinite(principal) && principal > 0 && isFinite(rate) && isFinite(term) && term > 0)){
+  const hasMonthly = isFinite(principal) && principal > 0;
+  const hasInitial = initial > 0;
+  if(!((hasMonthly || hasInitial) && isFinite(rate) && isFinite(term) && term > 0)){
     maturityEl.textContent = '—';
     investedEl.textContent = '—';
     noteEl.textContent = '';
@@ -2101,23 +2272,34 @@ function renderFundCalc(){
   }
 
   if(calcMode === 'lump'){
-    const maturity = principal * Math.pow(1 + rate/100, term);
+    // "Başlangıç Tutarı" alanı zaten tek seferlik yatırımın kendisidir; ayrıca
+    // girilen aylık tutar da (varsa) tek seferlik ek ana para gibi eklenir.
+    const base = initial + (hasMonthly ? principal : 0);
+    const maturity = base * Math.pow(1 + rate/100, term);
     maturityEl.textContent = fmt(maturity, 'TRY');
-    investedEl.textContent = fmt(principal, 'TRY');
+    investedEl.textContent = fmt(base, 'TRY');
     noteEl.textContent = 'Tek seferlik yatırım, yıllık bileşik getiriyle büyütülür.';
   } else {
-    // Monthly contributions compounding at the given annual rate — ordinary annuity future value.
+    // Başlangıç tutarı tek seferlik bileşir + her ay eklenen tutar bir annuite gibi bileşir.
     const months = Math.round(term * 12);
     const monthlyRate = (rate/100) / 12;
-    let maturity;
+    const monthly = hasMonthly ? principal : 0;
+
+    let fromInitial, fromMonthly;
     if(monthlyRate === 0){
-      maturity = principal * months;
+      fromInitial = initial;
+      fromMonthly = monthly * months;
     } else {
-      maturity = principal * ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate);
+      fromInitial = initial * Math.pow(1 + monthlyRate, months);
+      fromMonthly = monthly * ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate);
     }
+    const maturity = fromInitial + fromMonthly;
+    const invested = initial + monthly * months;
     maturityEl.textContent = fmt(maturity, 'TRY');
-    investedEl.textContent = fmt(principal * months, 'TRY');
-    noteEl.textContent = `Her ay ${fmt(principal,'TRY')} yatırıldığı, yıllık oranın 12'ye bölünerek aylık bileşik uygulandığı varsayılır.`;
+    investedEl.textContent = fmt(invested, 'TRY');
+    noteEl.textContent = hasInitial
+      ? `${fmt(initial,'TRY')} başlangıç + her ay ${fmt(monthly,'TRY')} katkı, yıllık oranın 12'ye bölünerek aylık bileşik uygulandığı varsayılır.`
+      : `Her ay ${fmt(monthly,'TRY')} yatırıldığı, yıllık oranın 12'ye bölünerek aylık bileşik uygulandığı varsayılır.`;
   }
 }
 
@@ -2125,35 +2307,43 @@ function renderFundCalc(){
 function loadSavingsIntoForm(){
   document.getElementById('save-target').value = invSave.target || '';
   document.getElementById('save-date').value = invSave.date || '';
-  document.getElementById('save-current').value = invSave.current || '';
+  document.getElementById('save-extra').value = invSave.extra || '';
 }
 
 function saveSavingsGoal(){
   invSave.target = parseFloat(document.getElementById('save-target').value) || 0;
   invSave.date = document.getElementById('save-date').value || '';
-  invSave.current = parseFloat(document.getElementById('save-current').value) || 0;
+  invSave.extra = parseFloat(document.getElementById('save-extra').value) || 0;
   persistInvSave();
-  renderSavings();
-  renderInvestTotals();
+  renderInvestTotals(); // toplam servet + ilerleme buradan yeniden hesaplanır
   showToast('Birikim hedefi kaydedildi');
 }
 
+// Toplam servet = tüm yatırımların (döviz/altın + hisse/fon) güncel değeri, seçili
+// para biriminde, artı varsa yatırım dışı ek nakit/banka birikimi.
 function renderSavings(){
+  const rc = reportCurrency();
   const target = parseFloat(document.getElementById('save-target').value) || 0;
-  const current = parseFloat(document.getElementById('save-current').value) || 0;
+  const extra = parseFloat(document.getElementById('save-extra').value) || 0;
   const dateVal = document.getElementById('save-date').value;
 
-  const pct = target > 0 ? Math.min(current / target, 1) : 0;
+  const fxTotal = invFx.reduce((s,h) => s + toReportCurrency(fxHoldingValue(h), 'TRY'), 0);
+  const posTotal = invPositions.reduce((s,p) => s + toReportCurrency(positionMarketValue(p), positionCurrency(p)), 0);
+  const wealth = fxTotal + posTotal + extra;
+
+  document.getElementById('save-wealth').textContent = fmt(wealth, rc);
+
+  const pct = target > 0 ? Math.min(wealth / target, 1) : 0;
   document.getElementById('save-progress').textContent = (pct*100).toFixed(1) + '%';
   document.getElementById('save-bar').style.width = (pct*100) + '%';
-  document.getElementById('save-remaining').textContent = fmt(Math.max(target - current, 0), 'TRY');
+  document.getElementById('save-remaining').textContent = fmt(Math.max(target - wealth, 0), rc);
 
   if(dateVal){
     const days = Math.max(Math.round((new Date(dateVal) - new Date(todayISO())) / 86400000), 0);
     document.getElementById('save-days').textContent = days + ' gün';
     const months = Math.max(days / 30, 1);
-    const needed = Math.max(target - current, 0) / months;
-    document.getElementById('save-needed').textContent = fmt(needed, 'TRY');
+    const needed = Math.max(target - wealth, 0) / months;
+    document.getElementById('save-needed').textContent = fmt(needed, rc);
   } else {
     document.getElementById('save-days').textContent = '—';
     document.getElementById('save-needed').textContent = '—';
@@ -2162,28 +2352,62 @@ function renderSavings(){
 
 // ---------- Yatırım: toplamlar ----------
 function renderInvestTotals(){
-  const fxTotal = invFx.reduce((s,h) => s + fxHoldingValue(h), 0);
-  const fxGain = invFx.reduce((s,h) => s + (h.cost ? fxHoldingValue(h) - h.cost : 0), 0);
+  const rc = reportCurrency();
+  const sym = rc === 'EUR' ? '€' : (rc === 'USD' ? '$' : '₺');
+  document.getElementById('inv-total-label').textContent = `Toplam Yatırım (${sym})`;
+  document.getElementById('inv-income-label').textContent = `Yatırım Geliri (${sym})`;
 
-  const fundTotal = invFund.reduce((s,f) => s + toTRY(f.current, f.currency||'TRY'), 0);
-  const fundGain = invFund.reduce((s,f) => s + toTRY(f.current - fundPrincipal(f), f.currency||'TRY'), 0);
+  const fxTotal = invFx.reduce((s,h) => s + toReportCurrency(fxHoldingValue(h), 'TRY'), 0);
+  const fxGain = invFx.reduce((s,h) => s + (h.cost ? toReportCurrency(fxHoldingValue(h) - h.cost, 'TRY') : 0), 0);
 
-  const divTotal = invDividends.reduce((s,d) => s + toTRY(d.amount, d.currency||'TRY'), 0);
+  const posTotal = invPositions.reduce((s,p) => s + toReportCurrency(positionMarketValue(p), positionCurrency(p)), 0);
+  const posUnrealized = invPositions.reduce((s,p) => s + toReportCurrency(positionUnrealizedPL(p), positionCurrency(p)), 0);
+  const posRealized = invPositions.reduce((s,p) => s + toReportCurrency(positionRealizedPL(p), positionCurrency(p)), 0);
 
-  const saveCurrent = parseFloat((document.getElementById('save-current')||{}).value) || invSave.current || 0;
+  const divTotal = invDividends.reduce((s,d) => s + toReportCurrency(d.amount, d.currency||'TRY'), 0);
 
-  const total = fxTotal + fundTotal + saveCurrent;
-  const income = fxGain + fundGain + divTotal;
+  const extraSavings = parseFloat((document.getElementById('save-extra')||{}).value) || invSave.extra || 0;
+
+  const investmentTotal = fxTotal + posTotal;   // yatırım varlıkları (nakit birikim hariç)
+  const income = fxGain + posUnrealized + posRealized + divTotal;
 
   const totalEl = document.getElementById('inv-total');
   const incomeEl = document.getElementById('inv-income');
-  if(totalEl) totalEl.textContent = fmt(total, 'TRY');
+  if(totalEl) totalEl.textContent = fmt(investmentTotal, rc);
   if(incomeEl){
-    incomeEl.textContent = fmt(income, 'TRY');
+    incomeEl.textContent = fmt(income, rc);
     incomeEl.className = 'val ' + (income >= 0 ? 'positive' : 'negative');
   }
 
-  renderAllocationChart(fxTotal, fundTotal, saveCurrent);
+  renderAllocationChart(fxTotal, posTotal, extraSavings);
+  renderSavings(); // birikim hedefi, toplam servete (yatırım + ek nakit) göre güncellenir
+}
+
+// Portfolio-wide simple (money-weighted) total return: gain ÷ all capital ever
+// deployed across open + sold lots, expressed in the user's chosen currency.
+function renderPortfolioReturn(){
+  const el = document.getElementById('portfolio-return');
+  if(!el) return;
+  const rc = reportCurrency();
+  const capitalDeployed = invPositions.reduce((s,p) => s + toReportCurrency(positionTotalCostAllTime(p), positionCurrency(p)), 0);
+  const unrealized = invPositions.reduce((s,p) => s + toReportCurrency(positionUnrealizedPL(p), positionCurrency(p)), 0);
+  const realized = invPositions.reduce((s,p) => s + toReportCurrency(positionRealizedPL(p), positionCurrency(p)), 0);
+  const divTotal = invDividends.reduce((s,d) => s + toReportCurrency(d.amount, d.currency||'TRY'), 0);
+  const totalReturn = unrealized + realized + divTotal;
+  if(capitalDeployed <= 0){
+    el.innerHTML = '';
+    return;
+  }
+  const pct = (totalReturn / capitalDeployed) * 100;
+  el.innerHTML = `
+    <div class="calc-card" style="margin-top:16px;">
+      <div class="calc-title">Portföy Toplam Getirisi (Hisse &amp; Fon)</div>
+      <div class="calc-result-row"><span class="lbl">Toplam Yatırılan Sermaye</span><span class="val">${fmt(capitalDeployed,rc)}</span></div>
+      <div class="calc-result-row"><span class="lbl">Gerçekleşmemiş K/Z</span><span class="val" style="color:${unrealized>=0?'var(--green)':'var(--rust)'};">${unrealized>=0?'+':''}${fmt(unrealized,rc)}</span></div>
+      <div class="calc-result-row"><span class="lbl">Gerçekleşmiş K/Z</span><span class="val" style="color:${realized>=0?'var(--green)':'var(--rust)'};">${realized>=0?'+':''}${fmt(realized,rc)}</span></div>
+      <div class="calc-result-row"><span class="lbl">Temettü Geliri</span><span class="val" style="color:var(--green);">+${fmt(divTotal,rc)}</span></div>
+      <div class="calc-result-row"><span class="lbl">Toplam Getiri</span><span class="val" style="color:${pct>=0?'var(--green)':'var(--rust)'};">${pct>=0?'+':''}${pct.toFixed(1)}%</span></div>
+    </div>`;
 }
 
 // ---------- PWA install ----------
