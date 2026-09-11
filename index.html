@@ -419,8 +419,9 @@
   .div-row .div-amt{font-family:'Fraunces',serif;font-size:13.5px;font-weight:500;color:var(--green);white-space:nowrap;}
 
   nav.bottom{
-    position:absolute;left:0;right:0;bottom:0;max-width:460px;margin:0 auto;background:var(--ink);
+    position:fixed;left:0;right:0;bottom:0;max-width:460px;margin:0 auto;background:var(--ink);
     display:flex;padding:10px 10px calc(10px + env(safe-area-inset-bottom));justify-content:space-around;align-items:center;
+    z-index:30;
   }
   nav.bottom button{
     background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;
@@ -1661,6 +1662,7 @@ function renderInvestmentsScreen(){
   renderSavings();
   // try a fresh fetch silently in the background; falls back to cached/manual values on failure
   fetchLiveRates(true);
+  refreshAllPositionPrices();
 }
 
 function populateGoldTypes(){
@@ -2083,14 +2085,42 @@ function sellPosition(id){
   renderInvestTotals();
 }
 
+function buyMorePosition(id){
+  const p = invPositions.find(x => x.id === id);
+  if(!p) return;
+  const qtyInput = window.prompt(`${p.symbol} — kaç adet/lot alıyorsun?`, '');
+  if(qtyInput === null) return;
+  const qty = parseFloat(qtyInput);
+  if(!isFinite(qty) || qty <= 0){ showToast('Geçersiz miktar'); return; }
+  const priceInput = window.prompt(`Alış fiyatı (${p.currency}, birim başı):`, p.currentPrice || '');
+  if(priceInput === null) return;
+  const price = parseFloat(priceInput);
+  if(!isFinite(price) || price <= 0){ showToast('Geçersiz fiyat'); return; }
+  const dateInput = window.prompt('Alış tarihi (YYYY-AA-GG):', todayISO());
+  if(dateInput === null) return;
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(dateInput) ? dateInput : todayISO();
+
+  p.lots.push({ id: uid(), date, qty, price, remainingQty: qty });
+  persistInvPositions();
+
+  const rawAmount = qty * price;
+  const expenseAmount = p.currency === 'USD' ? toTRY(rawAmount, 'USD') : rawAmount;
+  const expenseCurrency = p.currency === 'USD' ? 'TRY' : p.currency;
+  addAutoInvestEntry('Gider', expenseAmount, expenseCurrency, 'Yatırım', `Yatırım alımı: ${p.symbol} (${qty} adet)`, date, p.id);
+
+  showToast('Alım eklendi ve gider olarak kaydedildi');
+  renderPositionsList();
+  renderInvestTotals();
+}
+
 // Deneysel: Yahoo Finance'in resmi olmayan uç noktası üzerinden fiyat çekmeyi dener.
 // Yahoo bu erişimi resmi desteklemiyor — çalışabilir de çalışmayabilir de; başarısız
 // olursa sessizce elle girişe düşülür, uygulama asla bozulmaz.
-async function tryFetchPositionPrice(id){
+async function tryFetchPositionPrice(id, silent){
   const p = invPositions.find(x => x.id === id);
-  if(!p) return;
+  if(!p) return false;
   const ySymbol = p.assetClass === 'bist' ? `${p.symbol}.IS` : p.symbol;
-  showToast('Fiyat çekiliyor (deneysel)...');
+  if(!silent) showToast('Fiyat çekiliyor (deneysel)...');
   try{
     const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ySymbol)}`);
     if(r.ok){
@@ -2100,15 +2130,34 @@ async function tryFetchPositionPrice(id){
         p.currentPrice = price;
         p.lastPriceUpdate = new Date().toISOString();
         persistInvPositions();
-        renderPositionsList();
-        renderInvestTotals();
-        showToast(`${p.symbol}: ${fmt(price, p.currency)} olarak güncellendi`);
-        return;
+        if(!silent){
+          renderPositionsList();
+          renderInvestTotals();
+          showToast(`${p.symbol}: ${fmt(price, p.currency)} olarak güncellendi`);
+        }
+        return true;
       }
     }
     throw new Error('no price');
   }catch(e){
-    showToast('Otomatik çekilemedi — elle girmen gerekiyor');
+    if(!silent) showToast('Otomatik çekilemedi — elle girmen gerekiyor');
+    return false;
+  }
+}
+
+// Uygulamaya her girişte (Yatırım ekranı açıldığında) tüm pozisyonların fiyatını
+// sessizce çekmeyi dener — Yahoo'nun resmi olmayan ucu bazen çalışmaz, bu normaldir;
+// başarısız olanlar son bilinen fiyatta kalır, hiçbir hata gösterilmez.
+async function refreshAllPositionPrices(){
+  if(invPositions.length === 0) return;
+  let anyUpdated = false;
+  for(const p of invPositions){
+    const ok = await tryFetchPositionPrice(p.id, true);
+    if(ok) anyUpdated = true;
+  }
+  if(anyUpdated){
+    renderPositionsList();
+    renderInvestTotals();
   }
 }
 
@@ -2145,10 +2194,13 @@ function renderPositionsList(){
           ${tryEquivalent}
         </div>
       </div>
-      <div style="display:flex;gap:6px;margin:-6px 0 10px;padding-left:0;">
+      <div style="display:flex;gap:6px;margin:-6px 0 6px;padding-left:0;">
         <button class="refresh-btn" style="flex:1;padding:6px 4px;font-size:11px;" onclick="updatePositionPrice('${p.id}')">Fiyat Gir</button>
         <button class="refresh-btn" style="flex:1;padding:6px 4px;font-size:11px;" onclick="tryFetchPositionPrice('${p.id}')">Fiyat Çek (deneysel)</button>
-        <button class="refresh-btn" style="flex:1;padding:6px 4px;font-size:11px;" onclick="sellPosition('${p.id}')">Sat</button>
+      </div>
+      <div style="display:flex;gap:6px;margin:0 0 10px;padding-left:0;">
+        <button class="refresh-btn" style="flex:1;padding:6px 4px;font-size:11px;background:var(--green);color:var(--white);border-color:var(--green);" onclick="buyMorePosition('${p.id}')">+ Al</button>
+        <button class="refresh-btn" style="flex:1;padding:6px 4px;font-size:11px;background:var(--rust);color:var(--white);border-color:var(--rust);" onclick="sellPosition('${p.id}')">Sat</button>
         <button class="tx-del" onclick="deletePosition('${p.id}')">✕</button>
       </div>`;
   }).join('');
