@@ -241,6 +241,22 @@
   .legend-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
   .legend-row .lbl{flex:1;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .legend-row .amt{font-family:'Fraunces',serif;font-weight:500;color:var(--ink);white-space:nowrap;}
+  .cat-detail{padding:2px 0 10px 17px;}
+  .cat-detail-row{display:flex;gap:8px;font-size:11.5px;color:var(--ink-soft);padding:3px 0;}
+  .cat-detail-row .d{white-space:nowrap;}
+  .cat-detail-row .n{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .cat-detail-row .a{font-family:'Fraunces',serif;color:var(--ink);white-space:nowrap;}
+  .cat-trend{margin-bottom:10px;}
+  .cat-trend-title{font-size:10.5px;color:var(--ink-soft);margin-bottom:4px;}
+  .cat-trend-bars{display:flex;gap:6px;align-items:flex-end;height:60px;}
+  .cat-trend-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;}
+  .cat-trend-bar{width:100%;border-radius:2px 2px 0 0;min-height:2px;}
+  .cat-trend-lbl{font-size:9px;color:var(--ink-soft);}
+  .mover-card{background:var(--white);border:1px solid var(--paper-line);border-radius:12px;padding:13px 14px;margin-bottom:20px;}
+  .mover-card .mover-title{font-size:11px;color:var(--ink-soft);margin-bottom:5px;}
+  .mover-card .mover-body{display:flex;align-items:center;justify-content:space-between;}
+  .mover-card .mover-cat{font-size:14px;font-weight:600;color:var(--ink);}
+  .mover-card .mover-change{font-family:'Fraunces',serif;font-size:15px;font-weight:500;}
 
   .budget-alert{
     background:var(--rust-soft);
@@ -513,6 +529,8 @@
         </div>
       </div>
 
+      <div id="mover-insight"></div>
+
       <div class="section" id="cat-section-try">
         <div class="section-title">Kategoriye Göre Gider (₺)</div>
         <div id="donut-try"></div>
@@ -523,6 +541,18 @@
         <div class="section-title">Kategoriye Göre Gider (€)</div>
         <div id="donut-eur"></div>
         <div id="cat-list-eur"></div>
+      </div>
+
+      <div class="section" id="income-cat-section-try">
+        <div class="section-title">Kategoriye Göre Gelir (₺)</div>
+        <div id="donut-gelir-try"></div>
+        <div id="cat-list-gelir-try"></div>
+      </div>
+
+      <div class="section" id="income-cat-section-eur" style="display:none;">
+        <div class="section-title">Kategoriye Göre Gelir (€)</div>
+        <div id="donut-gelir-eur"></div>
+        <div id="cat-list-gelir-eur"></div>
       </div>
 
       <div class="section" id="trend-section-try">
@@ -646,10 +676,30 @@
       </div>
 
       <div class="section">
+        <div class="section-title">Özel Kategoriler</div>
+        <div class="section-sub">Hazır listede olmayan bir kategori mi lazım? Buradan ekle — Ekle ekranındaki listede otomatik görünür.</div>
+        <div id="custom-cat-list"></div>
+        <div class="type-toggle">
+          <button id="custom-cat-gider" class="active expense" onclick="setCustomCatType('Gider')">Gider</button>
+          <button id="custom-cat-gelir" onclick="setCustomCatType('Gelir')">Gelir</button>
+        </div>
+        <div class="field"><label>Kategori Adı</label><input type="text" id="custom-cat-name" placeholder="örn. Evcil Hayvan"></div>
+        <button class="save-btn neutral small" onclick="addCustomCategory()">Kategori Ekle</button>
+      </div>
+
+      <div class="section">
         <div class="section-title">Kategori Bazlı Bütçe Limitleri</div>
-        <div class="section-sub">Aylık limit belirle (₺); "Bu Ay" özetinde aşımı göreceksin.</div>
+        <div class="section-sub">Bir kategori seç, limit gir — "Bu Ay" özetinde aşımı göreceksin.</div>
         <div id="budget-list"></div>
-        <button class="save-btn neutral small" style="margin-top:6px;" onclick="saveBudgets()">Limitleri Kaydet</button>
+        <div class="field">
+          <label>Kategori</label>
+          <select id="budget-cat-select"></select>
+        </div>
+        <div class="field">
+          <label>Aylık Limit (₺)</label>
+          <input type="number" id="budget-cat-amount" step="10" min="0" placeholder="örn. 1000">
+        </div>
+        <button class="save-btn neutral small" onclick="setCategoryBudget()">Limit Belirle</button>
       </div>
 
       <div class="section">
@@ -893,6 +943,7 @@ const K_INV_POS = "butce_inv_positions";
 const K_INV_SAVE = "butce_inv_save";
 const K_INV_RATES = "butce_inv_rates";
 const K_INV_DIV = "butce_inv_dividends";
+const K_CUSTOM_CATS = "butce_custom_categories";
 
 let entries = [];
 let recurring = [];
@@ -904,6 +955,8 @@ let invPositions = [];  // [{id, assetClass, symbol, currency, lots:[{id,date,qt
 let invSave = { target: 0, date: '', extra: 0 };
 let invRates = { usd: null, eur: null, gold24: null, lastFetched: null };
 let invDividends = []; // [{id, name, date, amount, currency}]
+let customCategories = { gelir: [], gider: [] };
+let currentCustomCatType = 'Gider';
 let currentFxType = 'doviz';
 let currentFxCurrency = 'USD';
 let currentFundCurrency = 'TRY';
@@ -916,6 +969,7 @@ let currentScope = "month";
 let pickedMonth = null; // { year, monthIndex } when currentScope === 'pick'
 let editingId = null;
 let showAllTx = false;
+let expandedCategoryDetail = null; // "TRY:Market/Gıda" gibi — hangi kategori detayı açık
 
 function todayISO(){ return new Date().toISOString().slice(0,10); }
 
@@ -976,6 +1030,7 @@ function loadAll(){
   }
   invRates = safeParse(localStorage.getItem(K_INV_RATES), { usd: null, eur: null, gold24: null, lastFetched: null });
   invDividends = safeParse(localStorage.getItem(K_INV_DIV), []);
+  customCategories = safeParse(localStorage.getItem(K_CUSTOM_CATS), { gelir: [], gider: [] });
 }
 function persistEntries(){ try{ localStorage.setItem(K_ENTRIES, JSON.stringify(entries)); }catch(e){ showToast('Kayıt yapılamadı'); } }
 function persistRecurring(){ try{ localStorage.setItem(K_RECURRING, JSON.stringify(recurring)); }catch(e){} }
@@ -987,6 +1042,7 @@ function persistInvPositions(){ try{ localStorage.setItem(K_INV_POS, JSON.string
 function persistInvSave(){ try{ localStorage.setItem(K_INV_SAVE, JSON.stringify(invSave)); }catch(e){} }
 function persistInvRates(){ try{ localStorage.setItem(K_INV_RATES, JSON.stringify(invRates)); }catch(e){} }
 function persistInvDividends(){ try{ localStorage.setItem(K_INV_DIV, JSON.stringify(invDividends)); }catch(e){} }
+function persistCustomCategories(){ try{ localStorage.setItem(K_CUSTOM_CATS, JSON.stringify(customCategories)); }catch(e){} }
 
 // ---------- recurring auto-generation ----------
 function processRecurring(){
@@ -1025,6 +1081,7 @@ function showScreen(name){
   document.getElementById('nav-ayarlar').classList.toggle('active', name==='ayarlar');
   document.getElementById('nav-yatirim').classList.toggle('active', name==='yatirim');
   if(name==='ozet') renderSummary();
+  if(name==='ekle') populateCategories();
   if(name==='ayarlar') renderAyarlar();
   if(name==='yatirim') renderInvestmentsScreen();
 }
@@ -1108,10 +1165,55 @@ function setRecMethod(m){
   document.getElementById('rec-method-nakit').classList.toggle('active', m==='Nakit');
 }
 
+function allGiderKategorileri(){ return [...GIDER_KATEGORILERI, ...customCategories.gider]; }
+function allGelirKategorileri(){ return [...GELIR_KATEGORILERI, ...customCategories.gelir]; }
+
 function populateCategories(){
   const sel = document.getElementById('f-category');
-  const list = currentType === 'Gider' ? GIDER_KATEGORILERI : GELIR_KATEGORILERI;
+  const list = currentType === 'Gider' ? allGiderKategorileri() : allGelirKategorileri();
   sel.innerHTML = list.map(k => `<option value="${k}">${k}</option>`).join('');
+}
+
+function setCustomCatType(type){
+  currentCustomCatType = type;
+  document.getElementById('custom-cat-gider').classList.toggle('active', type==='Gider');
+  document.getElementById('custom-cat-gelir').classList.toggle('active', type==='Gelir');
+}
+
+function addCustomCategory(){
+  const name = document.getElementById('custom-cat-name').value.trim();
+  if(!name){ document.getElementById('custom-cat-name').focus(); return; }
+  const key = currentCustomCatType === 'Gider' ? 'gider' : 'gelir';
+  if(customCategories[key].includes(name)){ showToast('Bu kategori zaten var'); return; }
+  customCategories[key].push(name);
+  persistCustomCategories();
+  document.getElementById('custom-cat-name').value = '';
+  renderCustomCatList();
+  showToast('Kategori eklendi');
+}
+
+function removeCustomCategory(type, name){
+  const key = type === 'Gider' ? 'gider' : 'gelir';
+  customCategories[key] = customCategories[key].filter(c => c !== name);
+  persistCustomCategories();
+  renderCustomCatList();
+}
+
+function renderCustomCatList(){
+  const el = document.getElementById('custom-cat-list');
+  const rows = [
+    ...customCategories.gider.map(name => ({name, type:'Gider'})),
+    ...customCategories.gelir.map(name => ({name, type:'Gelir'})),
+  ];
+  if(rows.length === 0){
+    el.innerHTML = '<div class="empty-note">Henüz özel kategori eklenmedi.</div>';
+    return;
+  }
+  el.innerHTML = rows.map(r => `
+    <div class="budget-item">
+      <label>${escapeHtml(r.name)} <span style="color:var(--ink-soft);font-size:11px;">(${r.type})</span></label>
+      <button class="tx-del" onclick="removeCustomCategory('${r.type}','${escapeHtml(r.name)}')">✕</button>
+    </div>`).join('');
 }
 
 // ---------- add / edit / delete ----------
@@ -1150,6 +1252,7 @@ function editEntry(id){
   const e = entries.find(x => x.id === id);
   if(!e) return;
   editingId = id;
+  showScreen('ekle');
   setType(e.type);
   document.getElementById('f-category').value = e.category;
   document.getElementById('f-amount').value = e.amount;
@@ -1159,7 +1262,6 @@ function editEntry(id){
   setCurrencyEntry(e.currency || 'TRY');
   document.getElementById('save-btn').textContent = 'Güncelle';
   document.getElementById('edit-banner').style.display = 'flex';
-  showScreen('ekle');
 }
 
 function cancelEdit(){
@@ -1220,49 +1322,92 @@ function sumType(list, type, currency){
 }
 
 // ---------- donut chart ----------
-function buildDonut(dataArr, size, thickness){
+function buildDonut(dataArr, size, thickness, centerLabel, centerValue){
   const total = dataArr.reduce((s,d)=>s+d.value,0);
   if(total <= 0){
     return `<div class="empty-note">Gösterilecek veri yok.</div>`;
   }
   const radius = (size/2) - thickness/2;
   const circumference = 2 * Math.PI * radius;
+  const cx = size/2, cy = size/2;
   let acc = 0;
   const segs = dataArr.map(d => {
     const frac = d.value/total;
     const dash = frac * circumference;
-    const seg = `<circle cx="${size/2}" cy="${size/2}" r="${radius}" fill="none" stroke="${d.color}" stroke-width="${thickness}" stroke-dasharray="${dash} ${circumference-dash}" stroke-dashoffset="${-acc}" transform="rotate(-90 ${size/2} ${size/2})"/>`;
+    const seg = `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="${d.color}" stroke-width="${thickness}" stroke-dasharray="${dash} ${circumference-dash}" stroke-dashoffset="${-acc}" transform="rotate(-90 ${cx} ${cy})"/>`;
     acc += dash;
     return seg;
   }).join('');
-  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${segs}</svg>`;
+
+  // Yeterince büyük dilimlerin (>%7) üstüne, dilimin orta açısına denk gelen
+  // noktada yüzde etiketi basar — küçük dilimlerde metin sığmayacağı için atlanır.
+  let labelAcc = 0;
+  const labelRadius = radius; // dilimin tam ortasındaki yarıçap (halkanın üstünde)
+  const labels = dataArr.map(d => {
+    const frac = d.value/total;
+    const midFrac = labelAcc + frac/2;
+    labelAcc += frac;
+    if(frac < 0.07) return '';
+    const angle = -90 + midFrac*360;
+    const rad = angle * Math.PI/180;
+    const lx = cx + labelRadius*Math.cos(rad);
+    const ly = cy + labelRadius*Math.sin(rad);
+    return `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" font-family="Inter,sans-serif" font-size="${Math.max(size*0.075,10)}" font-weight="700" fill="#FFFDF8">${Math.round(frac*100)}%</text>`;
+  }).join('');
+
+  const centerHtml = centerLabel ? `
+    <text x="${cx}" y="${cy-8}" text-anchor="middle" dominant-baseline="middle" font-family="Inter,sans-serif" font-size="${size*0.075}" fill="#3E5850">${centerLabel}</text>
+    <text x="${cx}" y="${cy+12}" text-anchor="middle" dominant-baseline="middle" font-family="Fraunces,serif" font-weight="600" font-size="${size*0.115}" fill="#16302B">${centerValue}</text>
+  ` : '';
+
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${segs}${labels}${centerHtml}</svg>`;
 }
 
-function renderCategoryBlock(currency, giderList, donutElId, listElId){
+function renderCategoryBlock(currency, txList, donutElId, listElId, type){
+  type = type || 'Gider';
   const totals = {};
-  giderList.forEach(e => { totals[e.category] = (totals[e.category]||0) + e.amount; });
+  txList.forEach(e => { totals[e.category] = (totals[e.category]||0) + e.amount; });
   const catEntries = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
   const donutEl = document.getElementById(donutElId);
   const listEl = document.getElementById(listElId);
+  const emptyMsg = type === 'Gelir' ? 'Bu dönemde gelir kaydı yok.' : 'Bu dönemde gider kaydı yok.';
 
   if(catEntries.length === 0){
     donutEl.innerHTML = '';
-    listEl.innerHTML = '<div class="empty-note">Bu dönemde gider kaydı yok.</div>';
+    listEl.innerHTML = `<div class="empty-note">${emptyMsg}</div>`;
     return;
   }
 
+  const grandTotal = catEntries.reduce((s,[,v]) => s+v, 0);
   const donutData = catEntries.map(([cat,val]) => ({ value: val, color: CAT_COLORS[cat] || FALLBACK_COLOR }));
-  const svg = buildDonut(donutData, 140, 20);
-  const legend = catEntries.map(([cat,val]) => `
-    <div class="legend-row">
+  const svg = buildDonut(donutData, 140, 20, 'Toplam', fmt(grandTotal, currency));
+  const legend = catEntries.map(([cat,val]) => {
+    const key = `${type}:${currency}:${cat}`;
+    const isOpen = expandedCategoryDetail === key;
+    const pct = grandTotal > 0 ? (val/grandTotal*100) : 0;
+    let detailHtml = '';
+    if(isOpen){
+      const catTx = txList.filter(e => e.category === cat)
+        .sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 6);
+      const trendHtml = buildCategoryTrendChart(cat, type, currency);
+      detailHtml = `<div class="cat-detail">${trendHtml}${catTx.map(e => `
+        <div class="cat-detail-row">
+          <span class="d">${formatDate(e.date)}</span>
+          <span class="n">${escapeHtml(e.desc)}</span>
+          <span class="a">${fmt(e.amount, e.currency||'TRY')}</span>
+        </div>`).join('')}</div>`;
+    }
+    return `
+    <div class="legend-row" onclick="toggleCategoryDetail('${type}','${currency}','${escapeHtml(cat)}')" style="cursor:pointer;">
       <span class="legend-dot" style="background:${CAT_COLORS[cat]||FALLBACK_COLOR};"></span>
-      <span class="lbl">${cat}</span>
+      <span class="lbl">${cat} <span style="color:var(--ink-soft);">· ${pct.toFixed(0)}%</span></span>
       <span class="amt">${fmt(val, currency)}</span>
-    </div>`).join('');
+    </div>${detailHtml}`;
+  }).join('');
   donutEl.innerHTML = `<div class="donut-wrap">${svg}<div class="donut-legend">${legend}</div></div>`;
 
-  // budget rows (TRY only)
-  if(currency === 'TRY' && isMonthlyView()){
+  // budget rows — sadece gider tarafında ve ₺ cinsinden anlamlı
+  if(type === 'Gider' && currency === 'TRY' && isMonthlyView()){
     const rows = catEntries.map(([cat,val]) => {
       const limit = budgets[cat];
       if(!limit || limit <= 0) return '';
@@ -1279,6 +1424,7 @@ function renderCategoryBlock(currency, giderList, donutElId, listElId){
     }).join('');
     listEl.innerHTML = rows;
   } else {
+
     listEl.innerHTML = '';
   }
 }
@@ -1414,11 +1560,20 @@ function renderSummary(){
   }
 
   // category donuts
-  renderCategoryBlock('TRY', giderTRY, 'donut-try', 'cat-list-try');
+  renderCategoryBlock('TRY', giderTRY, 'donut-try', 'cat-list-try', 'Gider');
   document.getElementById('cat-section-eur').style.display = hasEUR ? 'block' : 'none';
   if(hasEUR){
-    renderCategoryBlock('EUR', eurList.filter(e=>e.type==='Gider'), 'donut-eur', 'cat-list-eur');
+    renderCategoryBlock('EUR', eurList.filter(e=>e.type==='Gider'), 'donut-eur', 'cat-list-eur', 'Gider');
   }
+
+  const gelirTRY = tryList.filter(e=>e.type==='Gelir');
+  renderCategoryBlock('TRY', gelirTRY, 'donut-gelir-try', 'cat-list-gelir-try', 'Gelir');
+  document.getElementById('income-cat-section-eur').style.display = hasEUR ? 'block' : 'none';
+  if(hasEUR){
+    renderCategoryBlock('EUR', eurList.filter(e=>e.type==='Gelir'), 'donut-gelir-eur', 'cat-list-gelir-eur', 'Gelir');
+  }
+
+  renderMoverInsight();
 
   // budget alert banner (month scope only)
   const alertBox = document.getElementById('budget-alert-box');
@@ -1474,6 +1629,87 @@ function toggleShowAllTx(){
   renderSummary();
 }
 
+function toggleCategoryDetail(type, currency, cat){
+  const key = `${type}:${currency}:${cat}`;
+  expandedCategoryDetail = (expandedCategoryDetail === key) ? null : key;
+  renderSummary();
+}
+
+// Seçilen kategori için son 6 ayın mini çubuk grafiği — kategori detayı açıldığında gösterilir.
+function buildCategoryTrendChart(cat, type, currency){
+  const now = new Date();
+  const months = [];
+  for(let i = 5; i >= 0; i--){
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({ y: d.getFullYear(), m: d.getMonth(), label: d.toLocaleDateString('tr-TR', {month:'short'}) });
+  }
+  const totals = months.map(({y,m}) => {
+    return entries
+      .filter(e => e.category === cat && e.type === type && (e.currency||'TRY') === currency)
+      .filter(e => { const d = new Date(e.date); return d.getFullYear()===y && d.getMonth()===m; })
+      .reduce((s,e) => s + e.amount, 0);
+  });
+  const maxVal = Math.max(...totals, 1);
+  const color = CAT_COLORS[cat] || FALLBACK_COLOR;
+  const bars = totals.map((v, i) => {
+    const h = Math.max(2, (v/maxVal) * 44);
+    return `<div class="cat-trend-col">
+      <div class="cat-trend-bar" style="height:${h}px;background:${color};"></div>
+      <div class="cat-trend-lbl">${months[i].label}</div>
+    </div>`;
+  }).join('');
+  return `<div class="cat-trend"><div class="cat-trend-title">Son 6 ay</div><div class="cat-trend-bars">${bars}</div></div>`;
+}
+
+// Bu ay ile geçen ayı (₺, gider) kategori bazında karşılaştırıp en çok değişeni bulur.
+function renderMoverInsight(){
+  const el = document.getElementById('mover-insight');
+  const now = new Date();
+  const thisY = now.getFullYear(), thisM = now.getMonth();
+  let lastY = thisY, lastM = thisM - 1;
+  if(lastM < 0){ lastM = 11; lastY -= 1; }
+
+  const catsInMonth = (y,m) => {
+    const totals = {};
+    entries.filter(e => e.type==='Gider' && (e.currency||'TRY')==='TRY').forEach(e => {
+      const d = new Date(e.date);
+      if(d.getFullYear()===y && d.getMonth()===m){
+        totals[e.category] = (totals[e.category]||0) + e.amount;
+      }
+    });
+    return totals;
+  };
+  const thisTotals = catsInMonth(thisY, thisM);
+  const lastTotals = catsInMonth(lastY, lastM);
+  const allCats = new Set([...Object.keys(thisTotals), ...Object.keys(lastTotals)]);
+
+  let best = null;
+  allCats.forEach(cat => {
+    const t = thisTotals[cat] || 0;
+    const l = lastTotals[cat] || 0;
+    const diff = t - l;
+    if(!best || Math.abs(diff) > Math.abs(best.diff)) best = { cat, t, l, diff };
+  });
+
+  if(!best || Math.abs(best.diff) < 1){
+    el.innerHTML = '';
+    return;
+  }
+  const pct = best.l > 0 ? (best.diff/best.l*100) : null;
+  const isIncrease = best.diff > 0;
+  const arrow = isIncrease ? '📈' : '📉';
+  const pctText = pct === null ? ' (yeni)' : ` (${isIncrease?'+':''}${pct.toFixed(0)}%)`;
+  el.innerHTML = `
+    <div class="mover-card">
+      <div class="mover-title">Ayın En Çok Değişen Kategorisi — geçen aya göre (₺)</div>
+      <div class="mover-body">
+        <span class="mover-cat">${arrow} ${best.cat}</span>
+        <span class="mover-change" style="color:${isIncrease?'var(--rust)':'var(--green)'};">${isIncrease?'+':''}${fmt(best.diff,'TRY')}${pctText}</span>
+      </div>
+    </div>`;
+}
+
+
 function formatDate(iso){
   const d = new Date(iso);
   if(isNaN(d)) return iso;
@@ -1493,15 +1729,12 @@ function renderAyarlar(){
   document.getElementById('report-cur-eur').classList.toggle('active', rc==='EUR');
   document.getElementById('report-cur-usd').classList.toggle('active', rc==='USD');
 
-  const budgetListEl = document.getElementById('budget-list');
-  budgetListEl.innerHTML = GIDER_KATEGORILERI.map(cat => `
-    <div class="budget-item">
-      <label>${cat}</label>
-      <input type="number" min="0" step="10" data-cat="${escapeHtml(cat)}" class="budget-input" value="${budgets[cat] || ''}" placeholder="₺ limit">
-    </div>`).join('');
+  renderCustomCatList();
+  renderBudgetList();
+  document.getElementById('budget-cat-select').innerHTML = allGiderKategorileri().map(k => `<option value="${k}">${k}</option>`).join('');
 
   const recSel = document.getElementById('rec-category');
-  recSel.innerHTML = GIDER_KATEGORILERI.map(k => `<option value="${k}">${k}</option>`).join('');
+  recSel.innerHTML = allGiderKategorileri().map(k => `<option value="${k}">${k}</option>`).join('');
 
   renderRecurringList();
 }
@@ -1549,15 +1782,36 @@ function deleteRecurring(id){
   renderRecurringList();
 }
 
-function saveBudgets(){
-  document.querySelectorAll('.budget-input').forEach(inp => {
-    const cat = inp.getAttribute('data-cat');
-    const val = parseFloat(inp.value);
-    if(val && val > 0) budgets[cat] = val;
-    else delete budgets[cat];
-  });
+function renderBudgetList(){
+  const el = document.getElementById('budget-list');
+  const setCats = Object.keys(budgets).filter(cat => budgets[cat] > 0);
+  if(setCats.length === 0){
+    el.innerHTML = '<div class="empty-note">Henüz limit belirlenmedi.</div>';
+    return;
+  }
+  el.innerHTML = setCats.map(cat => `
+    <div class="budget-item">
+      <label>${cat}</label>
+      <span style="font-family:'Fraunces',serif;font-weight:500;color:var(--ink);margin-right:8px;">${fmt(budgets[cat],'TRY')}</span>
+      <button class="tx-del" onclick="removeCategoryBudget('${escapeHtml(cat)}')">✕</button>
+    </div>`).join('');
+}
+
+function setCategoryBudget(){
+  const cat = document.getElementById('budget-cat-select').value;
+  const val = parseFloat(document.getElementById('budget-cat-amount').value);
+  if(!val || val <= 0){ document.getElementById('budget-cat-amount').focus(); return; }
+  budgets[cat] = val;
   persistBudgets();
-  showToast('Bütçe limitleri kaydedildi');
+  document.getElementById('budget-cat-amount').value = '';
+  renderBudgetList();
+  showToast(`${cat} için limit belirlendi`);
+}
+
+function removeCategoryBudget(cat){
+  delete budgets[cat];
+  persistBudgets();
+  renderBudgetList();
 }
 
 function saveInitialBalance(){
@@ -2120,9 +2374,15 @@ async function tryFetchPositionPrice(id, silent){
   const p = invPositions.find(x => x.id === id);
   if(!p) return false;
   const ySymbol = p.assetClass === 'bist' ? `${p.symbol}.IS` : p.symbol;
-  if(!silent) showToast('Fiyat çekiliyor (deneysel)...');
+  if(!silent) showToast('Fiyat çekiliyor...');
   try{
-    const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ySymbol)}`);
+    // Yahoo Finance CORS'u tarayıcıdan tamamen engelliyor; ücretsiz bir CORS proxy
+    // (allorigins) üzerinden dolaylı olarak erişiyoruz. Bu, ek bir bağımlılık
+    // katmanı demek — proxy geçici olarak erişilemez olursa fiyat çekilemez,
+    // ama en azından Yahoo'nun kendi engeli aşılmış olur.
+    const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ySymbol)}`;
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`;
+    const r = await fetch(proxyUrl);
     if(r.ok){
       const d = await r.json();
       const price = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
@@ -2196,7 +2456,7 @@ function renderPositionsList(){
       </div>
       <div style="display:flex;gap:6px;margin:-6px 0 6px;padding-left:0;">
         <button class="refresh-btn" style="flex:1;padding:6px 4px;font-size:11px;" onclick="updatePositionPrice('${p.id}')">Fiyat Gir</button>
-        <button class="refresh-btn" style="flex:1;padding:6px 4px;font-size:11px;" onclick="tryFetchPositionPrice('${p.id}')">Fiyat Çek (deneysel)</button>
+        <button class="refresh-btn" style="flex:1;padding:6px 4px;font-size:11px;" onclick="tryFetchPositionPrice('${p.id}')">Fiyat Çek</button>
       </div>
       <div style="display:flex;gap:6px;margin:0 0 10px;padding-left:0;">
         <button class="refresh-btn" style="flex:1;padding:6px 4px;font-size:11px;background:var(--green);color:var(--white);border-color:var(--green);" onclick="buyMorePosition('${p.id}')">+ Al</button>
