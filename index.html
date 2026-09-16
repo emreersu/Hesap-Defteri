@@ -659,6 +659,7 @@
       <div class="section">
         <div class="section-title">Yedekleme</div>
         <div class="section-sub">Tüm kayıtlarını, tekrarlayan giderlerini ve ayarlarını tek dosyada indir; gerektiğinde geri yükle.</div>
+        <div id="last-backup-note" class="section-sub" style="margin-top:-8px;"></div>
         <button class="save-btn neutral small" onclick="exportData()">Dışa Aktar (JSON indir)</button>
         <div class="field">
           <label>İçe Aktar (yedek dosyası seç)</label>
@@ -1811,6 +1812,7 @@ function escapeHtml(s){
 
 // ---------- Ayarlar screen ----------
 function renderAyarlar(){
+  renderLastBackupNote();
   document.getElementById('f-eurrate').value = settings.eurRate || '';
   document.getElementById('f-initbal-try').value = settings.initialBalanceTRY || '';
   document.getElementById('f-initbal-eur').value = settings.initialBalanceEUR || '';
@@ -1922,6 +1924,23 @@ function saveEurRate(){
 }
 
 // ---------- export / import ----------
+const K_LAST_BACKUP = "butce_last_backup";
+
+function renderLastBackupNote(){
+  const el = document.getElementById('last-backup-note');
+  if(!el) return;
+  const iso = localStorage.getItem(K_LAST_BACKUP);
+  if(!iso){
+    el.textContent = 'Henüz yedek almadın — "Dışa Aktar" ile şimdi alabilirsin.';
+    el.style.color = 'var(--rust)';
+    return;
+  }
+  const days = Math.floor((new Date() - new Date(iso)) / 86400000);
+  const when = days <= 0 ? 'bugün' : days === 1 ? '1 gün önce' : `${days} gün önce`;
+  el.textContent = `Son yedek: ${when} (${new Date(iso).toLocaleDateString('tr-TR')}).`;
+  el.style.color = days > 30 ? 'var(--rust)' : 'var(--ink-soft)';
+}
+
 function exportData(){
   const payload = { entries, recurring, budgets, settings, invFx, invPositions, invSave, invDividends, exportedAt: new Date().toISOString(), version: 4 };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -1933,6 +1952,8 @@ function exportData(){
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+  try{ localStorage.setItem(K_LAST_BACKUP, new Date().toISOString()); }catch(e){}
+  renderLastBackupNote();
   showToast('Yedek indirildi');
 }
 
