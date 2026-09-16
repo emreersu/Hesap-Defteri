@@ -1,4 +1,4 @@
-const CACHE_NAME = "butce-defteri-v18";
+const CACHE_NAME = "butce-defteri-v19";
 const APP_SHELL = [
   "./",
   "./index.html",
