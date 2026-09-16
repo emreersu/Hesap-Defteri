@@ -531,6 +531,12 @@
 
       <div id="mover-insight"></div>
 
+      <div class="section" id="needwant-section">
+        <div class="section-title">İhtiyaç / İstek / Tasarruf (₺)</div>
+        <div class="section-sub">Paranın ne kadarı zorunlu, ne kadarı keyfi, ne kadarı geleceğe gidiyor?</div>
+        <div id="needwant-chart"></div>
+      </div>
+
       <div class="section" id="cat-section-try">
         <div class="section-title">Kategoriye Göre Gider (₺)</div>
         <div id="donut-try"></div>
@@ -615,7 +621,16 @@
 
       <div class="field">
         <label>Kategori</label>
-        <select id="f-category"></select>
+        <select id="f-category" onchange="onCategoryChanged()"></select>
+      </div>
+
+      <div class="field" id="needwant-field">
+        <label>Harcama Türü</label>
+        <div class="method-toggle">
+          <button id="nw-ihtiyac" class="active" onclick="setNeedWant('İhtiyaç')">İhtiyaç</button>
+          <button id="nw-istek" onclick="setNeedWant('İstek')">İstek</button>
+          <button id="nw-tasarruf" onclick="setNeedWant('Tasarruf')">Tasarruf</button>
+        </div>
       </div>
 
       <div class="field">
@@ -932,6 +947,20 @@ const CAT_COLORS = {
 };
 const FALLBACK_COLOR = "#8A8A8A";
 
+// İhtiyaç / İstek / Tasarruf sınıflandırması. Her gider kategorisinin makul bir
+// varsayılanı vardır; kullanıcı her kayıtta bunu değiştirebilir.
+const NEED_WANT_TYPES = ["İhtiyaç", "İstek", "Tasarruf"];
+const NEED_WANT_COLORS = { "İhtiyaç": "#3E5850", "İstek": "#B98900", "Tasarruf": "#1E6B4E" };
+const CATEGORY_NEED_WANT = {
+  "Market/Gıda":"İhtiyaç", "Restoran/Kafe":"İstek", "Kira/Aidat":"İhtiyaç", "Faturalar":"İhtiyaç",
+  "Abonelikler":"İstek", "Ulaşım":"İhtiyaç", "Sağlık":"İhtiyaç", "Sigorta":"İhtiyaç",
+  "Eğitim":"İhtiyaç", "Giyim":"İstek", "Ev Eşyası/Bakım":"İhtiyaç", "Eğlence/Sosyal":"İstek",
+  "Seyahat/Tatil":"İstek", "Spor/Fitness":"İstek", "Kişisel Bakım":"İstek",
+  "Borç/Kredi Ödemesi":"İhtiyaç", "Kredi Kartı":"İhtiyaç", "Verilen Borç":"İhtiyaç",
+  "Yatırım":"Tasarruf", "Diğer Gider":"İhtiyaç",
+};
+function defaultNeedWant(category){ return CATEGORY_NEED_WANT[category] || "İhtiyaç"; }
+
 const K_ENTRIES = "butce_entries";
 const K_RECURRING = "butce_recurring";
 const K_BUDGETS = "butce_budgets";
@@ -1143,7 +1172,31 @@ function setType(type){
   if(!editingId){
     btn.className = 'save-btn ' + (type==='Gider' ? 'expense' : 'income');
   }
+  const nwField = document.getElementById('needwant-field');
+  if(nwField) nwField.style.display = type === 'Gider' ? 'block' : 'none';
   populateCategories();
+  if(type === 'Gider' && !needWantTouched) onCategoryChanged();
+}
+
+let currentNeedWant = 'İhtiyaç';
+let needWantTouched = false; // kullanıcı elle seçtiyse, kategori değişince ezme
+
+function setNeedWant(t){
+  currentNeedWant = t;
+  needWantTouched = true;
+  document.getElementById('nw-ihtiyac').classList.toggle('active', t==='İhtiyaç');
+  document.getElementById('nw-istek').classList.toggle('active', t==='İstek');
+  document.getElementById('nw-tasarruf').classList.toggle('active', t==='Tasarruf');
+}
+function applyNeedWantButtons(t){
+  currentNeedWant = t;
+  document.getElementById('nw-ihtiyac').classList.toggle('active', t==='İhtiyaç');
+  document.getElementById('nw-istek').classList.toggle('active', t==='İstek');
+  document.getElementById('nw-tasarruf').classList.toggle('active', t==='Tasarruf');
+}
+function onCategoryChanged(){
+  if(needWantTouched) return;
+  applyNeedWantButtons(defaultNeedWant(document.getElementById('f-category').value));
 }
 
 function setMethod(m){
@@ -1231,19 +1284,22 @@ function saveEntry(){
   if(wasEditing){
     const idx = entries.findIndex(e => e.id === editingId);
     if(idx > -1){
-      entries[idx] = { ...entries[idx], date, desc, category, type: currentType, method: currentMethod, amount, currency: currentCurrency };
+      entries[idx] = { ...entries[idx], date, desc, category, type: currentType, method: currentMethod, amount, currency: currentCurrency,
+        needWant: currentType === 'Gider' ? currentNeedWant : undefined };
     }
     editingId = null;
     document.getElementById('save-btn').textContent = 'Kaydet';
     document.getElementById('save-btn').className = 'save-btn ' + (currentType==='Gider' ? 'expense' : 'income');
     document.getElementById('edit-banner').style.display = 'none';
   } else {
-    entries.unshift({ id: uid(), date, desc, category, type: currentType, method: currentMethod, amount, currency: currentCurrency });
+    entries.unshift({ id: uid(), date, desc, category, type: currentType, method: currentMethod, amount, currency: currentCurrency,
+      needWant: currentType === 'Gider' ? currentNeedWant : undefined });
   }
   persistEntries();
 
   document.getElementById('f-amount').value = '';
   document.getElementById('f-desc').value = '';
+  needWantTouched = false;
   showToast(wasEditing ? 'Güncellendi' : 'Kaydedildi');
   showScreen('ozet');
 }
@@ -1260,12 +1316,15 @@ function editEntry(id){
   document.getElementById('f-desc').value = e.desc;
   setMethod(e.method);
   setCurrencyEntry(e.currency || 'TRY');
+  applyNeedWantButtons(e.needWant || defaultNeedWant(e.category));
+  needWantTouched = true;
   document.getElementById('save-btn').textContent = 'Güncelle';
   document.getElementById('edit-banner').style.display = 'flex';
 }
 
 function cancelEdit(){
   editingId = null;
+  needWantTouched = false;
   document.getElementById('f-amount').value = '';
   document.getElementById('f-desc').value = '';
   document.getElementById('f-date').value = todayISO();
@@ -1573,6 +1632,7 @@ function renderSummary(){
     renderCategoryBlock('EUR', eurList.filter(e=>e.type==='Gelir'), 'donut-gelir-eur', 'cat-list-gelir-eur', 'Gelir');
   }
 
+  renderNeedWantChart(giderTRY);
   renderMoverInsight();
 
   // budget alert banner (month scope only)
@@ -1659,6 +1719,36 @@ function buildCategoryTrendChart(cat, type, currency){
     </div>`;
   }).join('');
   return `<div class="cat-trend"><div class="cat-trend-title">Son 6 ay</div><div class="cat-trend-bars">${bars}</div></div>`;
+}
+
+// İhtiyaç / İstek / Tasarruf dağılımı — seçili dönemdeki ₺ giderler üzerinden.
+function renderNeedWantChart(giderTRY){
+  const el = document.getElementById('needwant-chart');
+  const sectionEl = document.getElementById('needwant-section');
+  const totals = { "İhtiyaç": 0, "İstek": 0, "Tasarruf": 0 };
+  giderTRY.forEach(e => {
+    const t = e.needWant || defaultNeedWant(e.category);
+    if(totals[t] === undefined) totals[t] = 0;
+    totals[t] += e.amount;
+  });
+  const grand = NEED_WANT_TYPES.reduce((s,t) => s + totals[t], 0);
+  if(grand <= 0){
+    sectionEl.style.display = 'none';
+    return;
+  }
+  sectionEl.style.display = 'block';
+
+  const data = NEED_WANT_TYPES
+    .filter(t => totals[t] > 0)
+    .map(t => ({ label: t, value: totals[t], color: NEED_WANT_COLORS[t] }));
+  const svg = buildDonut(data, 140, 20, 'Toplam', fmt(grand, 'TRY'));
+  const legend = data.map(d => `
+    <div class="legend-row">
+      <span class="legend-dot" style="background:${d.color};"></span>
+      <span class="lbl">${d.label} <span style="color:var(--ink-soft);">· ${(d.value/grand*100).toFixed(0)}%</span></span>
+      <span class="amt">${fmt(d.value,'TRY')}</span>
+    </div>`).join('');
+  el.innerHTML = `<div class="donut-wrap">${svg}<div class="donut-legend">${legend}</div></div>`;
 }
 
 // Bu ay ile geçen ayı (₺, gider) kategori bazında karşılaştırıp en çok değişeni bulur.
@@ -2062,6 +2152,7 @@ function addAutoInvestEntry(type, amount, currency, category, desc, date, refId)
   entries.unshift({
     id: uid(), date, desc, category, type,
     method: 'Kart', amount, currency: currency === 'USD' ? 'TRY' : currency,
+    needWant: type === 'Gider' ? 'Tasarruf' : undefined,
     autoGenerated: true, autoInvestRef: refId,
   });
   persistEntries();
@@ -2498,6 +2589,7 @@ function addDividend(){
   document.getElementById('div-amount').value = '';
   showToast('Temettü eklendi ve gelir olarak kaydedildi');
   renderDividendList();
+  renderPortfolioReturn();
   renderInvestTotals();
 }
 
@@ -2506,6 +2598,7 @@ function deleteDividend(id){
   persistInvDividends();
   removeAutoInvestEntries(id);
   renderDividendList();
+  renderPortfolioReturn();
   renderInvestTotals();
 }
 
