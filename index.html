@@ -1770,7 +1770,9 @@ function buildCategoryTrendChart(cat, type, currency){
 function renderIncomeAllocation(giderTRY, incomeTRY){
   const el = document.getElementById('income-alloc-chart');
   const sectionEl = document.getElementById('income-alloc-section');
-  if(incomeTRY <= 0){
+  // "Bu Ay" görünümünde kategori listesi zaten kalabalık oluyor — bu kart yalnızca
+  // Ay Seç, Yıl Seç ve Tüm Zamanlar'da gösterilir.
+  if(currentScope === 'month' || incomeTRY <= 0){
     sectionEl.style.display = 'none';
     return;
   }
