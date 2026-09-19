@@ -144,6 +144,8 @@
     outline:none;
   }
   #scope-month-input:focus{border-color:var(--ink);}
+  #scope-year-input{display:none;width:100%;padding:10px 12px;border:1px solid var(--paper-line);border-radius:9px;background:var(--white);font-family:'Fraunces',serif;font-size:16px;text-align:center;color:var(--ink);margin-bottom:18px;outline:none;}
+  #scope-year-input:focus{border-color:var(--ink);}
 
   .hero{
     text-align:left;
@@ -468,9 +470,11 @@
       <div class="scope-toggle">
         <button id="scope-month" class="active" onclick="setScope('month')">Bu Ay</button>
         <button id="scope-pick" onclick="setScope('pick')">Ay Seç</button>
+        <button id="scope-year" onclick="setScope('year')">Yıl Seç</button>
         <button id="scope-all" onclick="setScope('all')">Tüm Zamanlar</button>
       </div>
       <input type="month" id="scope-month-input" onchange="onMonthPick()">
+      <input type="number" id="scope-year-input" onchange="onYearPick()" placeholder="örn. 2024" min="2000" max="2100">
 
 
       <div id="budget-alert-box"></div>
@@ -530,6 +534,12 @@
       </div>
 
       <div id="mover-insight"></div>
+
+      <div class="section" id="income-alloc-section" style="display:none;">
+        <div class="section-title">Gelirin Nereye Gittiği</div>
+        <div class="section-sub">Toplam gelirinin yüzde kaçı hangi kategoriye gitmiş — kalanı "Harcanmayan (Net Tasarruf)" olarak görünür.</div>
+        <div id="income-alloc-chart"></div>
+      </div>
 
       <div class="section" id="needwant-section">
         <div class="section-title">İhtiyaç / İstek / Tasarruf (₺)</div>
@@ -1120,18 +1130,24 @@ function setScope(scope){
   currentScope = scope;
   document.getElementById('scope-month').classList.toggle('active', scope==='month');
   document.getElementById('scope-pick').classList.toggle('active', scope==='pick');
+  document.getElementById('scope-year').classList.toggle('active', scope==='year');
   document.getElementById('scope-all').classList.toggle('active', scope==='all');
 
-  const input = document.getElementById('scope-month-input');
+  const monthInput = document.getElementById('scope-month-input');
+  const yearInput = document.getElementById('scope-year-input');
+  monthInput.style.display = scope==='pick' ? 'block' : 'none';
+  yearInput.style.display = scope==='year' ? 'block' : 'none';
+
   if(scope === 'pick'){
-    input.style.display = 'block';
-    if(!input.value){
+    if(!monthInput.value){
       const now = new Date();
-      input.value = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+      monthInput.value = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
     }
     onMonthPick();
+  } else if(scope === 'year'){
+    if(!yearInput.value) yearInput.value = new Date().getFullYear();
+    onYearPick();
   } else {
-    input.style.display = 'none';
     renderSummary();
   }
 }
@@ -1144,17 +1160,38 @@ function onMonthPick(){
   renderSummary();
 }
 
+function onYearPick(){
+  const val = parseInt(document.getElementById('scope-year-input').value, 10);
+  if(!val) return;
+  pickedYear = val;
+  renderSummary();
+}
+
 function isMonthlyView(){ return currentScope !== 'all'; }
+// Bütçe limitleri aylık tanımlı olduğu için "Yıl Seç" görünümünde limit çubukları
+// yanıltıcı olur (bir yılın toplamı, aylık limitle kıyaslanmaz) — o yüzden ayrı bayrak.
+function isMonthLimitView(){ return currentScope === 'month' || currentScope === 'pick'; }
 
 function getScopeYearMonth(){
-  if(currentScope === 'all') return null;
+  if(currentScope === 'all' || currentScope === 'year') return null;
   if(currentScope === 'pick' && pickedMonth) return { year: pickedMonth.year, monthIndex: pickedMonth.monthIndex };
   const now = new Date();
   return { year: now.getFullYear(), monthIndex: now.getMonth() };
 }
 
+// Seçili dönemin başlangıç tarihini verir (devreden bakiye hesaplarında kullanılır).
+// 'all' için null (öncesinde hiçbir şey yok, zaten her şeyi kapsıyor).
+function getScopeStartDate(){
+  if(currentScope === 'all') return null;
+  if(currentScope === 'year') return new Date((pickedYear || new Date().getFullYear()), 0, 1);
+  const ym = getScopeYearMonth();
+  if(!ym) return null;
+  return new Date(ym.year, ym.monthIndex, 1);
+}
+
 function periodLabel(){
   if(currentScope === 'all') return 'Tüm Zamanlar';
+  if(currentScope === 'year') return String(pickedYear || new Date().getFullYear());
   let d;
   if(currentScope === 'pick' && pickedMonth){
     d = new Date(pickedMonth.year, pickedMonth.monthIndex, 1);
@@ -1350,6 +1387,11 @@ function showToast(msg){
 
 // ---------- scoping helpers ----------
 function scopedEntries(){
+  if(currentScope === 'all') return entries;
+  if(currentScope === 'year'){
+    const y = pickedYear || new Date().getFullYear();
+    return entries.filter(e => new Date(e.date).getFullYear() === y);
+  }
   const ym = getScopeYearMonth();
   if(!ym) return entries;
   return entries.filter(e => {
@@ -1363,9 +1405,8 @@ function scopedEntries(){
 // balance carry over from month to month instead of resetting each period.
 function openingBalance(currency){
   const base = currency === 'EUR' ? (settings.initialBalanceEUR||0) : (settings.initialBalanceTRY||0);
-  const ym = getScopeYearMonth();
-  if(!ym) return base; // "Tüm Zamanlar" already covers every entry — nothing more to carry in
-  const cutoff = new Date(ym.year, ym.monthIndex, 1);
+  const cutoff = getScopeStartDate();
+  if(!cutoff) return base; // "Tüm Zamanlar" already covers every entry — nothing more to carry in
   let income = 0, expense = 0;
   entries.forEach(e => {
     if((e.currency||'TRY') !== currency) return;
@@ -1466,8 +1507,8 @@ function renderCategoryBlock(currency, txList, donutElId, listElId, type){
   }).join('');
   donutEl.innerHTML = `<div class="donut-wrap">${svg}<div class="donut-legend">${legend}</div></div>`;
 
-  // budget rows — sadece gider tarafında ve ₺ cinsinden anlamlı
-  if(type === 'Gider' && currency === 'TRY' && isMonthlyView()){
+  // budget rows — sadece gider tarafında, ₺ cinsinden ve aylık görünümde anlamlı
+  if(type === 'Gider' && currency === 'TRY' && isMonthLimitView()){
     const rows = catEntries.map(([cat,val]) => {
       const limit = budgets[cat];
       if(!limit || limit <= 0) return '';
@@ -1633,12 +1674,13 @@ function renderSummary(){
     renderCategoryBlock('EUR', eurList.filter(e=>e.type==='Gelir'), 'donut-gelir-eur', 'cat-list-gelir-eur', 'Gelir');
   }
 
+  renderIncomeAllocation(giderTRY, incomeTRY);
   renderNeedWantChart(giderTRY);
   renderMoverInsight();
 
   // budget alert banner (month scope only)
   const alertBox = document.getElementById('budget-alert-box');
-  if(isMonthlyView()){
+  if(isMonthLimitView()){
     const overCats = Object.keys(budgets).filter(cat => {
       const limit = budgets[cat];
       if(!limit || limit<=0) return false;
@@ -1723,6 +1765,43 @@ function buildCategoryTrendChart(cat, type, currency){
 }
 
 // İhtiyaç / İstek / Tasarruf dağılımı — seçili dönemdeki ₺ giderler üzerinden.
+// Gelirin ne kadarının hangi kategoriye gittiğini gösterir — kalan kısım
+// "Harcanmayan (Net Tasarruf)" dilimi olarak eklenir; toplam her zaman gelire eşittir.
+function renderIncomeAllocation(giderTRY, incomeTRY){
+  const el = document.getElementById('income-alloc-chart');
+  const sectionEl = document.getElementById('income-alloc-section');
+  if(incomeTRY <= 0){
+    sectionEl.style.display = 'none';
+    return;
+  }
+  sectionEl.style.display = 'block';
+
+  const totals = {};
+  giderTRY.forEach(e => { totals[e.category] = (totals[e.category]||0) + e.amount; });
+  const catEntries = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+  const spentTotal = catEntries.reduce((s,[,v]) => s+v, 0);
+  const leftover = incomeTRY - spentTotal;
+
+  const data = catEntries.map(([cat,val]) => ({ value: val, color: CAT_COLORS[cat]||FALLBACK_COLOR, label: cat }));
+  if(leftover > 0){
+    data.push({ value: leftover, color: '#2E5B8A', label: 'Harcanmayan (Net Tasarruf)' });
+  }
+
+  const svg = buildDonut(data, 140, 20, 'Gelirin Tamamı', fmt(incomeTRY, 'TRY'));
+  const legend = data.map(d => `
+    <div class="legend-row">
+      <span class="legend-dot" style="background:${d.color};"></span>
+      <span class="lbl">${d.label} <span style="color:var(--ink-soft);">· gelirin %${(d.value/incomeTRY*100).toFixed(1)}'i</span></span>
+      <span class="amt">${fmt(d.value,'TRY')}</span>
+    </div>`).join('');
+
+  let note = '';
+  if(leftover < 0){
+    note = `<div class="fetch-warning" style="margin-top:10px;">Bu dönemde gelirinden ${fmt(Math.abs(leftover),'TRY')} fazla harcamışsın — negatif tasarruf.</div>`;
+  }
+  el.innerHTML = `<div class="donut-wrap">${svg}<div class="donut-legend">${legend}</div></div>${note}`;
+}
+
 function renderNeedWantChart(giderTRY){
   const el = document.getElementById('needwant-chart');
   const sectionEl = document.getElementById('needwant-section');
